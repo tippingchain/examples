@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ApeChainTippingInterface, ChainSelector } from '@tippingchain/ui-react';
 import { SUPPORTED_CHAINS, SUPPORTED_TESTNETS } from '@tippingchain/sdk';
 import { useActiveWalletChain } from 'thirdweb/react';
+import { INITIAL_CREATORS } from '../data/initialCreators';
 
 interface TippingPageProps {
   client: any;
@@ -30,8 +31,13 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
           <p className="text-xl text-gray-600">
             TippingChain v2.0 - Integrated Relay.link → USDC payouts on ApeChain
           </p>
-          <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-            ✨ New: Dynamic tier fees, testnet support (Holesky/Amoy)
+          <div className="mt-4 space-y-2">
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 mr-2">
+              ✨ New: Dynamic tier fees, testnet support (Holesky/Amoy)
+            </div>
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800">
+              🎯 Try with Creator #1: {INITIAL_CREATORS[0].wallet.slice(0, 8)}...
+            </div>
           </div>
         </div>
         

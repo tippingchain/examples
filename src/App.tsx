@@ -7,7 +7,6 @@ import { Navigation } from './components/Navigation';
 import { TippingPage } from './pages/TippingPage';
 import { AdminPage } from './pages/AdminPage';
 import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
-import { ThirdwebDemoPage } from './pages/ThirdwebDemoPage';
 
 const client = createThirdwebClient({
   clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'df6b18c1d07bf0cc9287b48180157b10'
@@ -38,10 +37,6 @@ function App() {
             <Route 
               path="/viewer-rewards" 
               element={<ViewerRewardsPage sdkConfig={{ client, sdk }} />} 
-            />
-            <Route 
-              path="/thirdweb-demo" 
-              element={<ThirdwebDemoPage sdk={sdk} />} 
             />
           </Routes>
         </div>

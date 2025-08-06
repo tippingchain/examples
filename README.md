@@ -57,6 +57,13 @@ The demo app is ready for immediate deployment to GitHub Pages. See [DEPLOYMENT.
    - `@tippingchain/ui-react`: ^2.0.0 (dynamic fee calculations)
    - `@tippingchain/contracts-interface`: ^1.2.0 (testnet configurations)
 
+4. **Initial Creator Setup:**
+   Before using the demo, you need to register the initial creator:
+   ```
+   📋 See INITIAL_SETUP.md for detailed instructions
+   🎯 Initial Creator: 0x479945d7931baC3343967bD0f839f8691E54a66e (Creator #1)
+   ```
+
 ## Running the Demo
 
 ### Local Development
@@ -115,11 +122,6 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
    - **Reward Pools**: Equal distribution among multiple viewers
    - **Statistics Dashboard**: Track reward history and platform metrics
 
-4. **Thirdweb Demo** (`/thirdweb-demo`) - Smart Account Integration
-   - Social login and account abstraction examples
-   - Creator registration with Thirdweb account IDs
-   - Smart wallet creation and gasless transactions
-   - Cross-wallet identity preservation and recovery
 
 ## Fee Structure (v2.0 Dynamic System)
 
@@ -140,10 +142,12 @@ After 5% platform fee to TippingChain treasury, remaining 95% split by tier:
 
 ## Testing Guide
 
+⚠️ **Prerequisites**: Ensure the initial creator is registered first (see [INITIAL_SETUP.md](./INITIAL_SETUP.md))
+
 ### 1. Basic Tipping Flow
 1. Navigate to the **Tipping** page
 2. Connect your wallet
-3. Select a creator (must be registered first)
+3. The demo uses Creator #1 (0x479945d7931baC3343967bD0f839f8691E54a66e)
 4. Choose source chain and amount
 5. Confirm transaction
 
@@ -165,12 +169,6 @@ After 5% platform fee to TippingChain treasury, remaining 95% split by tier:
 5. Set reward amount and reason
 6. Send rewards
 
-### 4. Thirdweb Integration
-1. Visit **Thirdweb Demo** page
-2. Try creator registration with thirdweb ID
-3. Search creators by thirdweb ID
-4. Register viewers with thirdweb IDs
-5. Send rewards using thirdweb IDs
 
 ## Supported Networks (v2.0)
 

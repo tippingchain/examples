@@ -2,11 +2,11 @@
   "name": "tippingchain-demo",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://tippingchain.github.io/tippingchain-demo/",
+  "homepage": "https://tippingchain.github.io/examples/",
   "type": "module",
   "dependencies": {
-    "@tippingchain/sdk": "^2.0.5",
-    "@tippingchain/ui-react": "^2.0.3",
+    "@tippingchain/sdk": "^2.0.6",
+    "@tippingchain/ui-react": "^2.0.4",
     "@types/react-router-dom": "^5.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.536.0",
@@ -21,6 +21,7 @@
     "@vitejs/plugin-react": "^4.0.0",
     "autoprefixer": "^10.4.21",
     "buffer": "^6.0.3",
+    "dotenv": "^16.4.5",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.0.0",
@@ -31,6 +32,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "add-initial-creator": "node --loader tsx/esm scripts/addInitialCreator.ts"
   }
 }

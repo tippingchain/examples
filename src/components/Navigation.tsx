@@ -56,16 +56,6 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
             >
               Viewer Rewards
             </Link>
-            <Link
-              to="/thirdweb-demo"
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                isActive('/thirdweb-demo')
-                  ? 'bg-orange-100 text-orange-800'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              Thirdweb Demo
-            </Link>
             
             {/* Wallet Connection */}
             <ConnectButton client={client} theme="light" />

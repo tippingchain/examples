@@ -1,8 +1,9 @@
 // src/pages/AdminPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
-import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift } from 'lucide-react';
+import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star } from 'lucide-react';
 import type { ApeChainTippingSDK } from '@tippingchain/sdk';
+import { INITIAL_CREATORS, getInitialCreatorByWallet } from '../data/initialCreators';
 
 interface AdminPageProps {
   sdk: ApeChainTippingSDK;
@@ -30,6 +31,12 @@ interface ViewerRewardStats {
   platformFeeRate: string;
 }
 
+interface OwnerInfo {
+  owner: string;
+  businessOwner: string;
+  isUserOwner: boolean;
+}
+
 export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
   const account = useActiveAccount();
   const activeChain = useActiveWalletChain();
@@ -37,6 +44,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [viewerRewardStats, setViewerRewardStats] = useState<ViewerRewardStats | null>(null);
+  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [newCreatorWallet, setNewCreatorWallet] = useState('');
   const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string } | null>(null);
@@ -68,6 +76,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
         setViewerRewardStats(viewerStats);
       } catch (error) {
         console.error('Failed to load viewer reward stats:', error);
+      }
+
+      // Load owner information
+      try {
+        const [owner, businessOwner] = await Promise.all([
+          sdk.getOwner(chainId),
+          sdk.getBusinessOwner(chainId)
+        ]);
+        const isUserOwner = account?.address ? 
+          await sdk.isOwner(chainId, account.address) : false;
+        
+        setOwnerInfo({
+          owner,
+          businessOwner,
+          isUserOwner
+        });
+      } catch (error) {
+        console.error('Failed to load owner info:', error);
       }
     } catch (error) {
       console.error('Failed to load admin data:', error);
@@ -188,6 +214,59 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
             </p>
           </div>
         </div>
+
+        {/* Owner Permissions Section */}
+        {ownerInfo && (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <Wallet className="w-6 h-6 mr-2" />
+                Contract Ownership & Permissions
+              </h2>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                ownerInfo.isUserOwner 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-600'
+              }`}>
+                {ownerInfo.isUserOwner ? '✓ Admin Access' : '✗ Read Only'}
+              </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-2">Contract Owner</h3>
+                <p className="text-sm font-mono bg-gray-50 p-3 rounded-lg break-all">
+                  {ownerInfo.owner}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Can add creators, update contract settings
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-2">Business Owner</h3>
+                <p className="text-sm font-mono bg-gray-50 p-3 rounded-lg break-all">
+                  {ownerInfo.businessOwner}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Receives business share from creator tips
+                </p>
+              </div>
+            </div>
+
+            {!ownerInfo.isUserOwner && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center text-yellow-800">
+                  <XCircle className="w-5 h-5 mr-2" />
+                  <p className="text-sm">
+                    <strong>Limited Access:</strong> You are not the contract owner. 
+                    Creator management functions are disabled. Connect with the owner wallet to add creators.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Message */}
         {message && (
@@ -325,11 +404,59 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
           </div>
         )}
 
+        {/* Initial Creator Setup */}
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <Star className="w-5 h-5 mr-2 text-orange-600" />
+            Initial Demo Creator
+          </h2>
+          
+          <div className="bg-white rounded-lg p-4 border border-orange-200">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-medium text-gray-900">Recommended Initial Creator</h3>
+                <p className="text-sm text-gray-600">Pre-configured for demo purposes</p>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
+                  Tier 1 (60/40)
+                </span>
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium text-gray-600">Wallet Address:</span>
+                <p className="font-mono text-gray-900 break-all mt-1">{INITIAL_CREATORS[0].wallet}</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Revenue Split: 60% creator / 40% business</span>
+                <button
+                  onClick={() => setNewCreatorWallet(INITIAL_CREATORS[0].wallet)}
+                  disabled={ownerInfo && !ownerInfo.isUserOwner}
+                  className="text-orange-600 hover:text-orange-700 font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Use This Address →
+                </button>
+              </div>
+            </div>
+            
+            {ownerInfo && !ownerInfo.isUserOwner && (
+              <div className="mt-3 p-3 bg-gray-50 rounded border text-xs text-gray-600">
+                💡 Only the contract owner can add creators. This address is recommended for initial setup.
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Add Creator */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
             <Plus className="w-5 h-5 mr-2" />
             Add New Creator
+            {ownerInfo && !ownerInfo.isUserOwner && (
+              <span className="ml-2 text-sm text-red-600">(Owner Only)</span>
+            )}
           </h2>
           
           <div className="flex space-x-4">
@@ -338,17 +465,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
               placeholder="Creator wallet address (0x...)"
               value={newCreatorWallet}
               onChange={(e) => setNewCreatorWallet(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              disabled={ownerInfo && !ownerInfo.isUserOwner}
+              className={`flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                ownerInfo && !ownerInfo.isUserOwner ? 'bg-gray-50 cursor-not-allowed' : ''
+              }`}
             />
             <button
               onClick={handleAddCreator}
-              disabled={loading}
+              disabled={loading || (ownerInfo && !ownerInfo.isUserOwner)}
               className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               <Plus className="w-4 h-4" />
               <span>Add Creator</span>
             </button>
           </div>
+          
+          {ownerInfo && !ownerInfo.isUserOwner && (
+            <div className="mt-3 text-sm text-gray-600">
+              💡 Only the contract owner can add new creators. Current owner: {ownerInfo.owner.slice(0, 8)}...
+            </div>
+          )}
         </div>
 
         {/* Creator List */}
