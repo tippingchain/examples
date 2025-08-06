@@ -2,10 +2,13 @@
   "name": "demo-tip-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@tippingchain/sdk": "^2.0.0",
+    "@tippingchain/sdk": "^2.0.1",
     "@tippingchain/ui-react": "^2.0.0",
     "@types/react-router-dom": "^5.3.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.536.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.7.1",
@@ -18,14 +21,14 @@
     "autoprefixer": "^10.4.21",
     "buffer": "^6.0.3",
     "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.11",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5.0.0",
     "util": "^0.12.5",
     "vite": "^4.4.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "./node_modules/.bin/vite",
+    "build": "./node_modules/.bin/vite build",
+    "preview": "./node_modules/.bin/vite preview"
   }
 }

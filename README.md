@@ -2,6 +2,12 @@
 
 A comprehensive demo application showcasing the TippingChain v2.0 ecosystem with integrated Relay.link architecture, dynamic tier-based fees, and enhanced viewer rewards system. Supports 9 source chains with ApeChain as the unified destination for stable USDC payouts.
 
+## 🌐 Live Demo
+
+**Deploy your own**: [![Deploy to GitHub Pages](https://img.shields.io/badge/Deploy-GitHub%20Pages-blue?logo=github)](https://github.com/tippingchain/examples/blob/main/DEPLOYMENT.md)
+
+The demo app is ready for immediate deployment to GitHub Pages. See [DEPLOYMENT.md](./DEPLOYMENT.md) for instructions.
+
 ## 🚀 What's New in v2.0
 
 - **🔗 Integrated Relay.link Architecture**: No separate bridge contracts needed - direct integration for simplified deployment
@@ -53,7 +59,12 @@ A comprehensive demo application showcasing the TippingChain v2.0 ecosystem with
 
 ## Running the Demo
 
+### Local Development
+
 ```bash
+# Install dependencies
+npm install
+
 # Development server
 npm run dev
 
@@ -65,6 +76,19 @@ npm run preview
 ```
 
 The demo will be available at `http://localhost:5173`
+
+### GitHub Pages Deployment
+
+Deploy automatically to GitHub Pages with one click:
+
+1. **Fork or clone** this repository to your GitHub account
+2. **Enable GitHub Pages**: Go to Settings → Pages → Source → "GitHub Actions" 
+3. **Push to main/master** branch - deployment happens automatically
+4. **Manual deploy**: Actions tab → "Deploy to GitHub Pages" → "Run workflow"
+
+Your app will be live at: `https://yourusername.github.io/repository-name/`
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
 ## App Structure
 

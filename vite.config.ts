@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: process.env.VITE_BASE_PATH || '/',
   define: {
     global: 'globalThis',
   },
@@ -17,7 +18,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['./wallet/globalThis.safe/image.js'],
+      external: ['./wallet/globalThis.safe/image.js', './wallet/globalThis.safe/index.js'],
     },
   },
 })
