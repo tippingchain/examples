@@ -10,13 +10,13 @@ import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
 import { ThirdwebDemoPage } from './pages/ThirdwebDemoPage';
 
 const client = createThirdwebClient({
-  clientId: process.env.REACT_APP_THIRDWEB_CLIENT_ID!
+  clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'df6b18c1d07bf0cc9287b48180157b10'
 });
 
 const sdk = new ApeChainTippingSDK({
-  clientId: process.env.REACT_APP_THIRDWEB_CLIENT_ID!,
+  clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'df6b18c1d07bf0cc9287b48180157b10',
   environment: 'production',
-  useTestnet: false, // Use mainnet (Base -> ApeChain)
+  useTestnet: import.meta.env.VITE_APP_NETWORK === 'testnet' || false
 });
 
 function App() {

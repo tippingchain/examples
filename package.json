@@ -5,8 +5,8 @@
   "homepage": "https://tippingchain.github.io/tippingchain-demo/",
   "type": "module",
   "dependencies": {
-    "@tippingchain/sdk": "^2.0.2",
-    "@tippingchain/ui-react": "^2.0.2",
+    "@tippingchain/sdk": "^2.0.4",
+    "@tippingchain/ui-react": "^2.0.3",
     "@types/react-router-dom": "^5.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.536.0",

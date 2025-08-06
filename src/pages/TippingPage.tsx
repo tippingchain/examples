@@ -11,7 +11,8 @@ interface TippingPageProps {
 
 export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
   const activeChain = useActiveWalletChain();
-  const [selectedChainId, setSelectedChainId] = useState<number | undefined>(8453); // Default to Base mainnet
+  const defaultChainId = parseInt(import.meta.env.VITE_APP_DEFAULT_CHAIN_ID || '8453');
+  const [selectedChainId, setSelectedChainId] = useState<number | undefined>(defaultChainId);
 
   React.useEffect(() => {
     if (activeChain && !selectedChainId) {

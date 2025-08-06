@@ -1,6 +1,6 @@
-# TippingChain v2.0 Demo Application
+# TippingChain Demo App
 
-A comprehensive demo application showcasing the TippingChain v2.0 ecosystem with integrated Relay.link architecture, dynamic tier-based fees, and enhanced viewer rewards system. Supports 9 source chains with ApeChain as the unified destination for stable USDC payouts.
+Demo application showcasing the TippingChain SDK and UI components for multi-chain tipping with USDC payouts on ApeChain.
 
 ## 🌐 Live Demo
 
@@ -49,7 +49,7 @@ The demo app is ready for immediate deployment to GitHub Pages. See [DEPLOYMENT.
    ```
 
    Required environment variables:
-   - `REACT_APP_THIRDWEB_CLIENT_ID`: Get from [Thirdweb Dashboard](https://thirdweb.com/dashboard)
+   - `VITE_THIRDWEB_CLIENT_ID`: Get from [Thirdweb Dashboard](https://thirdweb.com/dashboard)
 
 3. **Package versions (v2.0):**
    The demo uses the latest v2.0 packages:
