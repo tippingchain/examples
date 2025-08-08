@@ -6,6 +6,8 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/examples/',
   define: {
     global: 'globalThis',
+    'process.env': {},
+    'process.env.NODE_ENV': '"production"'
   },
   resolve: {
     alias: {
