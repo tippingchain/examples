@@ -5,6 +5,10 @@
     <link rel="icon" type="image/png" href="/examples/tippingchain.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TippingChain Demo</title>
+    <script>
+      window.process = window.process || { env: { NODE_ENV: 'production' } };
+      window.global = window.global || window;
+    </script>
   </head>
   <body>
     <div id="root"></div>
