@@ -4,9 +4,7 @@ Demo application showcasing the TippingChain SDK and UI components for multi-cha
 
 ## 🌐 Live Demo
 
-**Deploy your own**: [![Deploy to GitHub Pages](https://img.shields.io/badge/Deploy-GitHub%20Pages-blue?logo=github)](https://github.com/tippingchain/examples/blob/main/DEPLOYMENT.md)
-
-The demo app is ready for immediate deployment to GitHub Pages. See [DEPLOYMENT.md](./DEPLOYMENT.md) for instructions.
+The demo app is ready for immediate deployment to GitHub Pages.
 
 ## 🚀 What's New in v2.0
 
@@ -60,7 +58,6 @@ The demo app is ready for immediate deployment to GitHub Pages. See [DEPLOYMENT.
 4. **Initial Creator Setup:**
    Before using the demo, you need to register the initial creator:
    ```
-   📋 See INITIAL_SETUP.md for detailed instructions
    🎯 Initial Creator: 0x479945d7931baC3343967bD0f839f8691E54a66e (Creator #1)
    ```
 
@@ -92,10 +89,6 @@ Deploy automatically to GitHub Pages with one click:
 2. **Enable GitHub Pages**: Go to Settings → Pages → Source → "GitHub Actions" 
 3. **Push to main/master** branch - deployment happens automatically
 4. **Manual deploy**: Actions tab → "Deploy to GitHub Pages" → "Run workflow"
-
-Your app will be live at: `https://yourusername.github.io/repository-name/`
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
 ## App Structure
 
@@ -141,8 +134,6 @@ After 5% platform fee to TippingChain treasury, remaining 95% split by tier:
 - **Batch efficiency**: Up to 50 viewers per transaction
 
 ## Testing Guide
-
-⚠️ **Prerequisites**: Ensure the initial creator is registered first (see [INITIAL_SETUP.md](./INITIAL_SETUP.md))
 
 ### 1. Basic Tipping Flow
 1. Navigate to the **Tipping** page
@@ -265,39 +256,6 @@ After 5% platform fee to TippingChain treasury, remaining 95% split by tier:
 - **Fee Recipients**: Configure platform treasury addresses for 5%/1% fees
 - **Gas Limits**: Set appropriate limits for cross-chain relay transactions
 - **RPC Endpoints**: Use reliable RPC providers for all 9 supported chains
-
-## Troubleshooting
-
-### Common Issues (v2.0 Troubleshooting)
-
-1. **"Creator not found"**: 
-   - Ensure creator is registered via Admin Panel on the selected chain
-   - Check that creator wallet address matches exactly (case-sensitive)
-   - Verify you're connected to the correct network
-
-2. **"Not a registered creator"** (Viewer Rewards):
-   - Only registered creators can send viewer rewards
-   - Register as creator first via Admin Panel
-   - Confirm creator status is "Active"
-
-3. **"Viewer rewards disabled"**:
-   - Platform admin has temporarily disabled viewer rewards feature
-   - Check platform stats in Admin Panel for current status
-
-4. **"Transaction failed"**:
-   - Insufficient balance for gas fees + relay costs
-   - Network congestion - try increasing gas price
-   - Check minimum relay amounts via Relay.link API
-
-5. **"Relay service unavailable"**:
-   - Relay.link service may be down or maintaining
-   - Check supported routes: source chain → ApeChain
-   - Verify USDC liquidity on destination ApeChain
-
-6. **"Invalid tier calculation"**:
-   - Ensure creator tier is properly set (0-3 for Tiers 1-4)
-   - Check fee breakdown in UI matches expected tier percentages
-   - Verify contracts have latest tier configuration
 
 ### Support & Resources
 
