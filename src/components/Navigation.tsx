@@ -19,7 +19,7 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
           {/* Logo */}
           <div className="flex items-center space-x-2">
             <img 
-              src="/tippingchain.png" 
+              src="/examples/tippingchain.png" 
               alt="TippingChain" 
               className="h-8 w-8 object-contain"
             />

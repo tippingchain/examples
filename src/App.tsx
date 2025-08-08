@@ -21,7 +21,7 @@ const sdk = new ApeChainTippingSDK({
 function App() {
   return (
     <ThirdwebProvider>
-      <Router>
+      <Router basename="/examples">
         <div className="min-h-screen bg-gray-100">
           <Navigation client={client} />
           
