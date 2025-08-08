@@ -59,7 +59,7 @@ jobs:
       - name: Build application
         run: npm run build
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: /
           NODE_OPTIONS: --max-old-space-size=4096
         
       - name: Setup Pages

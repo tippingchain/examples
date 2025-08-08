@@ -18,10 +18,11 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <div className="flex items-center space-x-2">
-            <span className="text-2xl">🐒</span>
-            <h1 className="text-xl font-bold text-gray-900">
-              TippingChain Demo
-            </h1>
+            <img 
+              src="/tippingchain.png" 
+              alt="TippingChain" 
+              className="h-8 w-8 object-contain"
+            />
           </div>
 
           {/* Navigation Links */}
