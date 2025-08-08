@@ -1,8 +1,9 @@
 // src/pages/TippingPage.tsx
 import React, { useState, useEffect } from 'react';
-import { ApeChainTippingInterface, ChainSelector } from '@tippingchain/ui-react';
+import { ChainSelector } from '@tippingchain/ui-react';
 import { useActiveWalletChain, useActiveAccount, ConnectButton } from 'thirdweb/react';
 import { Play, Pause, Users, Eye, Heart, DollarSign } from 'lucide-react';
+import { MultiTokenTippingInterface } from '../components/MultiTokenTippingInterface';
 
 interface TippingPageProps {
   client: any;
@@ -217,21 +218,26 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
               )}
             </div>
 
-            {/* Tipping Component */}
+            {/* Multi-Token Tipping Component */}
             {isCorrectTipper ? (
-              <ApeChainTippingInterface
+              <MultiTokenTippingInterface
                 creatorId={1} // Use creator ID from registry
-                streamId="live-demo-stream"
-                sdkConfig={{
-                  client,
-                  sdk
+                client={client}
+                sdk={sdk}
+                onTipSuccess={(result) => {
+                  console.log('Tip successful:', result);
+                  // Could add success toast or animation here
+                }}
+                onTipError={(error) => {
+                  console.error('Tip failed:', error);
+                  // Could add error toast here
                 }}
               />
             ) : (
               <div className="p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
                 <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 font-medium mb-2">Tipping Interface Locked</p>
-                <p className="text-sm text-gray-500">Connect with the demo tipper wallet to unlock tipping functionality</p>
+                <p className="text-gray-600 font-medium mb-2">Multi-Token Tipping Interface Locked</p>
+                <p className="text-sm text-gray-500">Connect with the demo tipper wallet to unlock multi-token tipping functionality</p>
               </div>
             )}
           </div>
@@ -245,9 +251,9 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-blue-600">1</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Choose Your Chain</h3>
+              <h3 className="text-xl font-semibold mb-2">Choose Your Token</h3>
               <p className="text-gray-600">
-                Tip with any token on 9 supported blockchains - Ethereum, Polygon, Optimism, BSC, Abstract, Avalanche, Base, Arbitrum, or Taiko
+                Tip with native tokens or ERC20s (USDC, DAI, WETH) on 9 supported blockchains - see real-time balances and token info
               </p>
             </div>
             

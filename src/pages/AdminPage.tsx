@@ -556,6 +556,176 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
           </div>
         </div>
 
+        {/* Supported Tokens Management */}
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Settings className="w-5 h-5 mr-2 text-blue-600" />
+              Supported Tokens Configuration
+            </h3>
+            {isAdminWallet && (
+              <button
+                onClick={() => {/* Add new token functionality */}}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Token
+              </button>
+            )}
+          </div>
+
+          {/* Chain selector for token management */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Chain to Configure Tokens
+            </label>
+            <div className="w-64">
+              <ChainSelector
+                value={selectedChainId}
+                onChange={(chainId) => setSelectedChainId(chainId)}
+                label=""
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* Token configuration table */}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Token</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Address</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Decimals</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Type</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Status</th>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {/* Mock token data - in real app would come from tokenConfig */}
+                <tr>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center">
+                      <span className="text-lg mr-2">💎</span>
+                      <div>
+                        <div className="font-medium">ETH</div>
+                        <div className="text-sm text-gray-500">Ethereum</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="text-sm text-gray-600">Native Token</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="font-mono text-sm">18</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Native
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button className="text-blue-600 hover:text-blue-800 text-sm">
+                      Configure
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center">
+                      <span className="text-lg mr-2">💵</span>
+                      <div>
+                        <div className="font-medium">USDC</div>
+                        <div className="text-sm text-gray-500">USD Coin</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="font-mono text-xs">0xA0b8...9f15</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="font-mono text-sm">6</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Stablecoin
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button className="text-blue-600 hover:text-blue-800 text-sm mr-3">
+                      Configure
+                    </button>
+                    <button className="text-red-600 hover:text-red-800 text-sm">
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center">
+                      <span className="text-lg mr-2">🟡</span>
+                      <div>
+                        <div className="font-medium">DAI</div>
+                        <div className="text-sm text-gray-500">Dai Stablecoin</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="font-mono text-xs">0x6B17...1d0F</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="font-mono text-sm">18</span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Stablecoin
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      Testing
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button className="text-blue-600 hover:text-blue-800 text-sm mr-3">
+                      Configure
+                    </button>
+                    <button className="text-green-600 hover:text-green-800 text-sm mr-3">
+                      Enable
+                    </button>
+                    <button className="text-red-600 hover:text-red-800 text-sm">
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Token management info */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h4 className="font-medium text-blue-800 mb-2">Token Configuration Notes:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Native tokens (ETH, MATIC, BNB) are automatically supported</li>
+              <li>• ERC20 tokens require contract addresses and decimal precision</li>
+              <li>• Stablecoins (USDC, DAI, USDT) offer better conversion rates</li>
+              <li>• Popular tokens are highlighted in the tipping interface</li>
+              <li>• Test tokens in testnet environments before mainnet activation</li>
+            </ul>
+          </div>
+        </div>
+
         {/* Info Section */}
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h3 className="text-xl font-semibold mb-4 text-gray-900">Admin Management Features</h3>
