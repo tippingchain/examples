@@ -1,440 +1,484 @@
 // src/pages/ViewerRewardsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
+import { useActiveAccount, useActiveWalletChain, ConnectButton } from 'thirdweb/react';
 import { 
-  ViewerRewardInterface, 
   BatchViewerReward,
   ViewerSelector,
-  RewardPoolInterface 
+  ChainSelector
 } from '@tippingchain/ui-react';
-import { Award, Users, DollarSign, TrendingUp } from 'lucide-react';
-import { SUPPORTED_CHAINS, SUPPORTED_TESTNETS } from '@tippingchain/sdk';
+import { Award, Users, DollarSign, TrendingUp, Gift, Eye, CheckCircle, Clock, X } from 'lucide-react';
 
 interface ViewerRewardsPageProps {
+  client: any;
   sdkConfig: {
     client: any;
     sdk: any;
   };
 }
 
-const getChainName = (chainId: number): string => {
-  const chainNames: Record<number, string> = {
-    1: 'Ethereum',
-    137: 'Polygon', 
-    10: 'Optimism',
-    56: 'BSC',
-    2741: 'Abstract',
-    43114: 'Avalanche',
-    8453: 'Base',
-    42161: 'Arbitrum',
-    167000: 'Taiko',
-    33139: 'ApeChain',
-    17000: 'Ethereum Holesky',
-    80002: 'Polygon Amoy',
-    33111: 'ApeChain Curtis'
-  };
-  return chainNames[chainId] || `Chain ${chainId}`;
-};
+const DEMO_CREATOR_WALLET = '0x479945d7931baC3343967bD0f839f8691E54a66e';
+const DEMO_ALLOCATION_AMOUNT = 100; // $100 USD
 
-export const ViewerRewardsPage: React.FC<ViewerRewardsPageProps> = ({ sdkConfig }) => {
+// Mock viewer data for demo
+const MOCK_VIEWERS = [
+  { id: 1, username: 'CryptoFan123', wallet: '0x1234567890123456789012345678901234567890', status: 'eligible' },
+  { id: 2, username: 'BlockchainBob', wallet: '0x2345678901234567890123456789012345678901', status: 'eligible' },
+  { id: 3, username: 'DefiDave', wallet: '0x3456789012345678901234567890123456789012', status: 'claimed' },
+  { id: 4, username: 'NFTNinja', wallet: '0x4567890123456789012345678901234567890123', status: 'eligible' },
+  { id: 5, username: 'Web3Warrior', wallet: '0x5678901234567890123456789012345678901234', status: 'eligible' },
+  { id: 6, username: 'TokenTiger', wallet: '0x6789012345678901234567890123456789012345', status: 'claimed' },
+  { id: 7, username: 'MetaverseMax', wallet: '0x7890123456789012345678901234567890123456', status: 'pending' },
+  { id: 8, username: 'SmartContractSam', wallet: '0x8901234567890123456789012345678901234567', status: 'eligible' }
+];
+
+export const ViewerRewardsPage: React.FC<ViewerRewardsPageProps> = ({ client, sdkConfig }) => {
   const account = useActiveAccount();
-  const [creatorId, setCreatorId] = useState<number | null>(null);
-  const [creatorChainId, setCreatorChainId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [rewardStats, setRewardStats] = useState({
-    totalRewardsGiven: '0',
-    rewardCount: 0
-  });
-  const [platformStats, setPlatformStats] = useState({
-    totalRewards: '0',
-    rewardsEnabled: true,
-    platformFeeRate: '100'
-  });
-  const [selectedViewer, setSelectedViewer] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'pool' | 'stats'>('single');
+  const activeChain = useActiveWalletChain();
+  const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Base default
+  const [viewers, setViewers] = useState(MOCK_VIEWERS);
+  const [selectedViewers, setSelectedViewers] = useState<number[]>([]);
+  const [allocationAmount, setAllocationAmount] = useState(DEMO_ALLOCATION_AMOUNT);
+  const [rewardPerViewer, setRewardPerViewer] = useState(0);
+  const [activeTab, setActiveTab] = useState<'allocate' | 'claim'>('allocate');
 
-  // Check if the connected wallet is a creator
+  const isCreatorWallet = account?.address?.toLowerCase() === DEMO_CREATOR_WALLET.toLowerCase();
+  const eligibleViewers = viewers.filter(v => v.status === 'eligible');
+  const userViewer = viewers.find(v => v.wallet?.toLowerCase() === account?.address?.toLowerCase());
+
   useEffect(() => {
-    const checkCreatorStatus = async () => {
-      if (!account) {
-        setLoading(false);
-        return;
+    if (selectedViewers.length > 0) {
+      setRewardPerViewer(allocationAmount / selectedViewers.length);
+    } else {
+      setRewardPerViewer(0);
+    }
+  }, [selectedViewers, allocationAmount]);
+
+  const handleViewerToggle = (viewerId: number) => {
+    setSelectedViewers(prev => {
+      if (prev.includes(viewerId)) {
+        return prev.filter(id => id !== viewerId);
+      } else {
+        return [...prev, viewerId];
       }
+    });
+  };
 
-      try {
-        setLoading(true);
-        setError('');
-        
-        // Try to find creator on all supported chains (v2.0)
-        const chains = [
-          SUPPORTED_CHAINS.ETHEREUM, SUPPORTED_CHAINS.POLYGON, SUPPORTED_CHAINS.OPTIMISM,
-          SUPPORTED_CHAINS.BSC, SUPPORTED_CHAINS.ABSTRACT, SUPPORTED_CHAINS.AVALANCHE,
-          SUPPORTED_CHAINS.BASE, SUPPORTED_CHAINS.ARBITRUM, SUPPORTED_CHAINS.TAIKO,
-          // Include testnets
-          SUPPORTED_TESTNETS.HOLESKY, SUPPORTED_TESTNETS.AMOY
-        ];
-        
-        for (const chainId of chains) {
-          try {
-            const creator = await sdkConfig.sdk.getCreatorByWallet(account.address, chainId);
-            if (creator && creator.id > 0) {
-              setCreatorId(creator.id);
-              setCreatorChainId(chainId);
-              
-              // Fetch reward stats
-              const stats = await sdkConfig.sdk.getViewerRewardStats(account.address, chainId);
-              setRewardStats({
-                totalRewardsGiven: stats.totalRewardsGiven,
-                rewardCount: stats.rewardCount
-              });
-              
-              console.log(`Creator found on chain ${chainId}`);
-              break;
-            }
-          } catch (err) {
-            // Continue checking other chains
-          }
-        }
-        
-        // Fetch platform stats
-        const pStats = await sdkConfig.sdk.getViewerRewardsPlatformStats(137); // Default to Polygon
-        setPlatformStats(pStats);
-        
-      } catch (err) {
-        console.error('Error checking creator status:', err);
-        setError('Failed to verify creator status');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const handleSelectAllEligible = () => {
+    const eligibleIds = eligibleViewers.map(v => v.id);
+    setSelectedViewers(eligibleIds);
+  };
 
-    checkCreatorStatus();
-  }, [account, sdkConfig.sdk]);
+  const handleClearSelection = () => {
+    setSelectedViewers([]);
+  };
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
-        </div>
-      </div>
-    );
-  }
+  const handleBatchReward = async () => {
+    if (selectedViewers.length === 0) {
+      alert('Please select at least one viewer to reward');
+      return;
+    }
 
-  if (!account) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <Award className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Connect Your Wallet</h2>
-          <p className="text-gray-600">
-            Please connect your wallet to access viewer rewards features.
-          </p>
-        </div>
-      </div>
-    );
-  }
+    try {
+      // Mock batch reward execution
+      const rewardAmount = (allocationAmount / selectedViewers.length).toFixed(2);
+      
+      // Update viewer statuses to 'pending'
+      setViewers(prev => prev.map(viewer => 
+        selectedViewers.includes(viewer.id) 
+          ? { ...viewer, status: 'pending' }
+          : viewer
+      ));
 
-  if (!creatorId) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <Award className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Creator Access Required</h2>
-          <p className="text-gray-600 mb-4">
-            Only registered creators can send viewer rewards.
-          </p>
-          <p className="text-sm text-gray-500">
-            Connected wallet: {account.address.slice(0, 6)}...{account.address.slice(-4)}
-          </p>
-        </div>
-      </div>
-    );
-  }
+      alert(`Batch reward sent! ${selectedViewers.length} viewers will each receive $${rewardAmount} in USDC on ApeChain.`);
+      
+      // Reset selection
+      setSelectedViewers([]);
 
-  if (!platformStats.rewardsEnabled) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <Award className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Viewer Rewards Temporarily Disabled</h2>
-          <p className="text-gray-600">
-            The platform administrator has temporarily disabled viewer rewards.
-          </p>
-        </div>
-      </div>
-    );
-  }
+      // Simulate processing time - after 3 seconds, mark as eligible for claiming
+      setTimeout(() => {
+        setViewers(prev => prev.map(viewer => 
+          selectedViewers.includes(viewer.id) 
+            ? { ...viewer, status: 'eligible' }
+            : viewer
+        ));
+      }, 3000);
+
+    } catch (error) {
+      console.error('Batch reward error:', error);
+      alert('Failed to send batch rewards');
+    }
+  };
+
+  const handleClaimReward = async (viewerId: number) => {
+    try {
+      // Mock claim execution
+      setViewers(prev => prev.map(viewer => 
+        viewer.id === viewerId 
+          ? { ...viewer, status: 'claimed' }
+          : viewer
+      ));
+
+      const viewer = viewers.find(v => v.id === viewerId);
+      alert(`Reward claimed! ${viewer?.username} received their USDC on ApeChain.`);
+    } catch (error) {
+      console.error('Claim error:', error);
+      alert('Failed to claim reward');
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Award className="w-8 h-8 text-orange-600" />
-              Viewer Rewards
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Reward your audience with crypto tokens. Platform fee: {(parseInt(platformStats.platformFeeRate) / 100).toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Creator ID</p>
-            <p className="text-2xl font-bold text-orange-600">#{creatorId}</p>
-            {creatorChainId && (
-              <p className="text-xs text-gray-500 mt-1">
-                Registered on {getChainName(creatorChainId)}
-              </p>
-            )}
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3">
+            <Award className="w-10 h-10 text-purple-600" />
+            Viewer Rewards Demo
+          </h1>
+          <p className="text-xl text-gray-600">
+            Creators allocate funds to reward their audience - viewers can claim eligible rewards
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
+        {/* Wallet Connection Alerts */}
+        {!account && (
+          <div className="mb-6 bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Rewards Sent</p>
-                <p className="text-2xl font-bold">
-                  {(parseFloat(rewardStats.totalRewardsGiven) / 1e18).toFixed(4)} MATIC
-                </p>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <Award className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <strong>Demo Mode:</strong> Connect as creator to allocate rewards, or as viewer to claim
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1 font-mono">
+                    Creator: {DEMO_CREATOR_WALLET}
+                  </p>
+                </div>
               </div>
-              <DollarSign className="w-8 h-8 text-green-600" />
+              <ConnectButton client={client} theme="light" />
             </div>
           </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Viewers Rewarded</p>
-                <p className="text-2xl font-bold">{rewardStats.rewardCount}</p>
-              </div>
-              <Users className="w-8 h-8 text-blue-600" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Platform Total</p>
-                <p className="text-2xl font-bold">
-                  {(parseFloat(platformStats.totalRewards) / 1e18).toFixed(2)} MATIC
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-purple-600" />
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('single')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'single'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Single Reward
-            </button>
-            <button
-              onClick={() => setActiveTab('batch')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'batch'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Batch Rewards
-            </button>
-            <button
-              onClick={() => setActiveTab('pool')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'pool'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Reward Pool
-            </button>
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'stats'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Statistics
-            </button>
-          </nav>
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex justify-center space-x-8">
+              <button
+                onClick={() => setActiveTab('allocate')}
+                className={`py-4 px-6 border-b-2 font-medium text-lg ${
+                  activeTab === 'allocate'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Gift className="w-5 h-5 inline mr-2" />
+                Batch Reward Allocation
+              </button>
+              <button
+                onClick={() => setActiveTab('claim')}
+                className={`py-4 px-6 border-b-2 font-medium text-lg ${
+                  activeTab === 'claim'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5 inline mr-2" />
+                Claim Rewards
+              </button>
+            </nav>
+          </div>
         </div>
-      </div>
 
-      {/* Tab Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {activeTab === 'single' && (
-          <>
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Select Viewer</h2>
-              <ViewerSelector
-                sdkConfig={sdkConfig}
-                onViewerSelect={setSelectedViewer}
-                selectedViewerId={selectedViewer?.id}
-                allowUnregistered={true}
-                className="mb-4"
-              />
-              {selectedViewer && (
-                <div className="bg-blue-50 rounded-lg p-4 mt-4">
-                  <p className="text-sm text-blue-800">
-                    Selected: {selectedViewer.address 
-                      ? `${selectedViewer.address.slice(0, 6)}...${selectedViewer.address.slice(-4)}`
-                      : `Viewer #${selectedViewer.id}`
-                    }
+        {activeTab === 'allocate' && (
+          <div className="space-y-8">
+            {/* Creator Access Check */}
+            {account && !isCreatorWallet && (
+              <div className="bg-orange-100 border-l-4 border-orange-500 p-4 rounded">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <X className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-orange-700">
+                      <strong>Creator Access Required:</strong> Only the demo creator can allocate rewards
+                    </p>
+                    <p className="text-xs text-orange-600 mt-1">
+                      Expected: <span className="font-mono">{DEMO_CREATOR_WALLET}</span>
+                    </p>
+                    <p className="text-xs text-orange-600">
+                      Connected: <span className="font-mono">{account.address}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Creator Interface */}
+            {isCreatorWallet && (
+              <div className="bg-green-100 border-l-4 border-green-500 p-4 rounded">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-green-700">
+                      <strong>Creator Access Verified!</strong> You can allocate rewards to viewers
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Allocation Panel */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h2 className="text-2xl font-semibold mb-6 text-gray-900 flex items-center">
+                    <DollarSign className="w-6 h-6 mr-2 text-green-600" />
+                    Reward Allocation
+                  </h2>
+
+                  <div className="space-y-6">
+                    {/* Allocation Amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Total Allocation (USD)
+                      </label>
+                      <input
+                        type="number"
+                        value={allocationAmount}
+                        onChange={(e) => setAllocationAmount(Number(e.target.value))}
+                        disabled={!isCreatorWallet}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100"
+                        placeholder="100"
+                      />
+                    </div>
+
+                    {/* Chain Selection */}
+                    <div>
+                      <ChainSelector
+                        value={selectedChainId}
+                        onChange={setSelectedChainId}
+                        label="Source Chain"
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Statistics */}
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Selected Viewers:</span>
+                        <span className="font-medium">{selectedViewers.length}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Reward per Viewer:</span>
+                        <span className="font-medium">${rewardPerViewer.toFixed(2)} USDC</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Platform Fee (1%):</span>
+                        <span className="font-medium">${(allocationAmount * 0.01).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold border-t pt-2">
+                        <span>Total Cost:</span>
+                        <span>${allocationAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleSelectAllEligible}
+                        disabled={!isCreatorWallet}
+                        className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Select All Eligible ({eligibleViewers.length})
+                      </button>
+                      
+                      <button
+                        onClick={handleClearSelection}
+                        disabled={!isCreatorWallet}
+                        className="w-full px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Clear Selection
+                      </button>
+
+                      <button
+                        onClick={handleBatchReward}
+                        disabled={!isCreatorWallet || selectedViewers.length === 0}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        Send Batch Rewards
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Viewer Selection */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h2 className="text-2xl font-semibold mb-6 text-gray-900 flex items-center">
+                    <Users className="w-6 h-6 mr-2 text-blue-600" />
+                    Select Viewers to Reward
+                  </h2>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {viewers.map((viewer) => (
+                      <div
+                        key={viewer.id}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          selectedViewers.includes(viewer.id)
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        } ${viewer.status !== 'eligible' ? 'opacity-60' : ''}`}
+                        onClick={() => isCreatorWallet && viewer.status === 'eligible' && handleViewerToggle(viewer.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold text-sm">
+                                {viewer.username?.charAt(0) || 'V'}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{viewer.username}</p>
+                              <p className="text-xs text-gray-500 font-mono">
+                                {viewer.wallet?.slice(0, 6)}...{viewer.wallet?.slice(-4)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              viewer.status === 'eligible' ? 'bg-green-100 text-green-800' :
+                              viewer.status === 'claimed' ? 'bg-blue-100 text-blue-800' :
+                              viewer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {viewer.status}
+                            </div>
+                            {selectedViewers.includes(viewer.id) && (
+                              <CheckCircle className="w-5 h-5 text-purple-600 mt-1" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'claim' && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-semibold mb-6 text-gray-900 text-center flex items-center justify-center">
+                <Gift className="w-6 h-6 mr-2 text-green-600" />
+                Claim Your Rewards
+              </h2>
+
+              {!account ? (
+                <div className="text-center py-8">
+                  <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-4">Connect your wallet to check for available rewards</p>
+                  <ConnectButton client={client} theme="light" />
+                </div>
+              ) : userViewer ? (
+                <div className="text-center py-8">
+                  <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <span className="text-white font-bold text-2xl">
+                      {userViewer.username?.charAt(0) || 'V'}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Welcome, {userViewer.username}!</h3>
+                  
+                  {userViewer.status === 'eligible' && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-4">
+                      <div className="flex items-center justify-center mb-4">
+                        <Gift className="w-8 h-8 text-green-600 mr-2" />
+                        <span className="text-lg font-semibold text-green-800">Reward Available!</span>
+                      </div>
+                      <p className="text-green-700 mb-4">
+                        You have an unclaimed reward waiting for you
+                      </p>
+                      <button
+                        onClick={() => handleClaimReward(userViewer.id)}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                      >
+                        Claim Reward
+                      </button>
+                    </div>
+                  )}
+                  
+                  {userViewer.status === 'claimed' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-4">
+                      <div className="flex items-center justify-center mb-2">
+                        <CheckCircle className="w-8 h-8 text-blue-600 mr-2" />
+                        <span className="text-lg font-semibold text-blue-800">Already Claimed</span>
+                      </div>
+                      <p className="text-blue-700">
+                        You have successfully claimed your reward. USDC has been sent to your wallet on ApeChain.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {userViewer.status === 'pending' && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-4">
+                      <div className="flex items-center justify-center mb-2">
+                        <Clock className="w-8 h-8 text-yellow-600 mr-2" />
+                        <span className="text-lg font-semibold text-yellow-800">Processing</span>
+                      </div>
+                      <p className="text-yellow-700">
+                        Your reward is being processed. Please check back soon.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Eye className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">
+                    Your wallet is not registered as a viewer in this demo.
+                  </p>
+                  <p className="text-sm text-gray-500 mt-2 font-mono">
+                    Connected: {account.address}
                   </p>
                 </div>
               )}
             </div>
-            
-            <ViewerRewardInterface
-              sdkConfig={sdkConfig}
-              creatorId={creatorId}
-              onRewardSent={(result) => {
-                alert(`Reward sent successfully! TX: ${result.transactionHash}`);
-                // Refresh stats
-                sdkConfig.sdk.getViewerRewardStats(account!.address, 137).then(stats => {
-                  setRewardStats({
-                    totalRewardsGiven: stats.totalRewardsGiven,
-                    rewardCount: stats.rewardCount
-                  });
-                });
-              }}
-            />
-          </>
-        )}
-
-        {activeTab === 'batch' && (
-          <div className="lg:col-span-2">
-            <BatchViewerReward
-              sdkConfig={sdkConfig}
-              onBatchSent={(result) => {
-                alert(`Batch rewards sent successfully! TX: ${result.transactionHash}`);
-                // Refresh stats
-                sdkConfig.sdk.getViewerRewardStats(account!.address, 137).then(stats => {
-                  setRewardStats({
-                    totalRewardsGiven: stats.totalRewardsGiven,
-                    rewardCount: stats.rewardCount
-                  });
-                });
-              }}
-            />
           </div>
         )}
 
-        {activeTab === 'pool' && (
-          <div className="lg:col-span-2">
-            <RewardPoolInterface
-              sdk={sdkConfig.sdk}
-              onSuccess={(result) => {
-                alert(`Reward pool distributed successfully! ${result.viewerCount} viewers each received ${(parseFloat(result.perViewerAmount) / 1e18).toFixed(6)} tokens.`);
-                // Refresh stats
-                sdkConfig.sdk.getViewerRewardStats(account!.address, 137).then(stats => {
-                  setRewardStats({
-                    totalRewardsGiven: stats.totalRewardsGiven,
-                    rewardCount: stats.rewardCount
-                  });
-                });
-              }}
-              onError={(error) => {
-                console.error('Reward pool error:', error);
-                alert(`Failed to create reward pool: ${error.message}`);
-              }}
-            />
-          </div>
-        )}
-
-        {activeTab === 'stats' && (
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-6">Reward Statistics</h2>
-              
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-3">Your Creator Stats</h3>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Rewards Given</span>
-                      <span className="font-medium">
-                        {(parseFloat(rewardStats.totalRewardsGiven) / 1e18).toFixed(6)} MATIC
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Number of Rewards</span>
-                      <span className="font-medium">{rewardStats.rewardCount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Average Reward Size</span>
-                      <span className="font-medium">
-                        {rewardStats.rewardCount > 0 
-                          ? (parseFloat(rewardStats.totalRewardsGiven) / 1e18 / rewardStats.rewardCount).toFixed(6)
-                          : '0'
-                        } MATIC
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-3">Platform Overview</h3>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Platform Rewards</span>
-                      <span className="font-medium">
-                        {(parseFloat(platformStats.totalRewards) / 1e18).toFixed(4)} MATIC
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Platform Fee Rate</span>
-                      <span className="font-medium">
-                        {(parseInt(platformStats.platformFeeRate) / 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Rewards Status</span>
-                      <span className={`font-medium ${platformStats.rewardsEnabled ? 'text-green-600' : 'text-red-600'}`}>
-                        {platformStats.rewardsEnabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> All viewer rewards are automatically converted to USDC and sent to ApeChain for stable payouts.
-                  </p>
-                </div>
-              </div>
+        {/* Info Section */}
+        <div className="mt-12 bg-white rounded-xl shadow-lg p-8">
+          <h3 className="text-xl font-semibold mb-4 text-gray-900">How Viewer Rewards Work</h3>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-medium mb-2 text-purple-600">For Creators:</h4>
+              <ul className="space-y-1 text-sm text-gray-600">
+                <li>• Allocate a total reward amount (e.g., $100)</li>
+                <li>• Select eligible viewers from your audience</li>
+                <li>• Funds are split equally among selected viewers</li>
+                <li>• Only 1% platform fee (vs 5% for regular tips)</li>
+                <li>• All rewards auto-convert to USDC on ApeChain</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2 text-green-600">For Viewers:</h4>
+              <ul className="space-y-1 text-sm text-gray-600">
+                <li>• Check if you have eligible rewards to claim</li>
+                <li>• Click "Claim Reward" to receive your USDC</li>
+                <li>• Funds are sent directly to your wallet on ApeChain</li>
+                <li>• No gas fees for claiming rewards</li>
+                <li>• Stable USDC payouts for price protection</li>
+              </ul>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Info Section */}
-      <div className="mt-8 bg-gray-50 rounded-lg p-6">
-        <h3 className="font-semibold mb-2">How Viewer Rewards Work</h3>
-        <ul className="space-y-2 text-sm text-gray-600">
-          <li>• Creators can reward viewers with crypto tokens for engagement</li>
-          <li>• Platform fee is only {(parseInt(platformStats.platformFeeRate) / 100).toFixed(1)}% (vs 5% for creator tips)</li>
-          <li>• Viewers can be rewarded by ID, wallet address, or Thirdweb ID</li>
-          <li>• All rewards are automatically converted to USDC on ApeChain</li>
-          <li>• Batch rewards support up to 50 viewers at once</li>
-          <li>• Reward pools distribute funds equally among multiple viewers</li>
-        </ul>
+        </div>
       </div>
     </div>
   );

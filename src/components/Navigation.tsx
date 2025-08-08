@@ -34,17 +34,7 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
-              Tipping
-            </Link>
-            <Link
-              to="/admin"
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                isActive('/admin')
-                  ? 'bg-orange-100 text-orange-800'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              Admin Panel
+              🔴 Creator Tip Demo
             </Link>
             <Link
               to="/viewer-rewards"
@@ -54,7 +44,17 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
-              Viewer Rewards
+              🎁 Viewer Rewards Demo
+            </Link>
+            <Link
+              to="/admin"
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                isActive('/admin')
+                  ? 'bg-orange-100 text-orange-800'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              👑 Admin Manager
             </Link>
             
             {/* Wallet Connection */}

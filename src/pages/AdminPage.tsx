@@ -1,107 +1,74 @@
 // src/pages/AdminPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react';
-import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star } from 'lucide-react';
+import { useActiveAccount, useActiveWalletChain, ConnectButton } from 'thirdweb/react';
+import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star, Settings, Shield } from 'lucide-react';
+import { ChainSelector } from '@tippingchain/ui-react';
 import type { ApeChainTippingSDK } from '@tippingchain/sdk';
-import { INITIAL_CREATORS, getInitialCreatorByWallet } from '../data/initialCreators';
 
 interface AdminPageProps {
+  client: any;
   sdk: ApeChainTippingSDK;
 }
+
+const DEMO_ADMIN_WALLET = '0xf45DFB1B23524C7fcB4dC17851Ce20815123Cec2';
 
 interface Creator {
   id: number;
   wallet: string;
+  tier: number;
   active: boolean;
   totalTips: string;
   tipCount: number;
 }
 
-interface PlatformStats {
-  totalTips: string;
-  totalCount: number;
-  totalRelayed: string;
-  activeCreators: number;
-  autoRelayEnabled: boolean;
-}
+// Mock creator data for demo
+const MOCK_CREATORS: Creator[] = [
+  {
+    id: 1,
+    wallet: '0x479945d7931baC3343967bD0f839f8691E54a66e',
+    tier: 1, // Tier 1: 60/40 split
+    active: true,
+    totalTips: '1500000000000000000', // 1.5 ETH in wei
+    tipCount: 25
+  },
+  {
+    id: 2,
+    wallet: '0x1234567890123456789012345678901234567890',
+    tier: 2, // Tier 2: 70/30 split
+    active: true,
+    totalTips: '750000000000000000', // 0.75 ETH in wei
+    tipCount: 12
+  },
+  {
+    id: 3,
+    wallet: '0x2345678901234567890123456789012345678901',
+    tier: 3, // Tier 3: 80/20 split
+    active: false,
+    totalTips: '0',
+    tipCount: 0
+  }
+];
 
-interface ViewerRewardStats {
-  totalRewards: string;
-  rewardsEnabled: boolean;
-  platformFeeRate: string;
-}
+const TIER_INFO = {
+  1: { name: 'Tier 1', split: '60/40', description: '60% Creator / 40% Business' },
+  2: { name: 'Tier 2', split: '70/30', description: '70% Creator / 30% Business' },
+  3: { name: 'Tier 3', split: '80/20', description: '80% Creator / 20% Business' },
+  4: { name: 'Tier 4', split: '90/10', description: '90% Creator / 10% Business' },
+};
 
-interface OwnerInfo {
-  owner: string;
-  businessOwner: string;
-  isUserOwner: boolean;
-}
-
-export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
+export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const account = useActiveAccount();
   const activeChain = useActiveWalletChain();
   
-  const [creators, setCreators] = useState<Creator[]>([]);
-  const [stats, setStats] = useState<PlatformStats | null>(null);
-  const [viewerRewardStats, setViewerRewardStats] = useState<ViewerRewardStats | null>(null);
-  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
+  const [creators, setCreators] = useState<Creator[]>(MOCK_CREATORS);
+  const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Base default
   const [loading, setLoading] = useState(false);
   const [newCreatorWallet, setNewCreatorWallet] = useState('');
-  const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string } | null>(null);
+  const [newCreatorTier, setNewCreatorTier] = useState(1);
+  const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string; tier: number } | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const chainId = activeChain?.id || 8453; // Default to Base mainnet
-
-  // Load creators and stats
-  useEffect(() => {
-    if (activeChain) {
-      loadData();
-    }
-  }, [activeChain, sdk]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // Load top creators (this will get all active creators)
-      const topCreators = await sdk.getTopCreators(50, chainId);
-      setCreators(topCreators);
-
-      // Load platform stats
-      const platformStats = await sdk.getPlatformStats(chainId);
-      setStats(platformStats);
-      
-      // Load viewer reward stats
-      try {
-        const viewerStats = await sdk.getViewerRewardsPlatformStats(chainId);
-        setViewerRewardStats(viewerStats);
-      } catch (error) {
-        console.error('Failed to load viewer reward stats:', error);
-      }
-
-      // Load owner information
-      try {
-        const [owner, businessOwner] = await Promise.all([
-          sdk.getOwner(chainId),
-          sdk.getBusinessOwner(chainId)
-        ]);
-        const isUserOwner = account?.address ? 
-          await sdk.isOwner(chainId, account.address) : false;
-        
-        setOwnerInfo({
-          owner,
-          businessOwner,
-          isUserOwner
-        });
-      } catch (error) {
-        console.error('Failed to load owner info:', error);
-      }
-    } catch (error) {
-      console.error('Failed to load admin data:', error);
-      showMessage('error', 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isAdminWallet = account?.address?.toLowerCase() === DEMO_ADMIN_WALLET.toLowerCase();
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -114,51 +81,86 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
       return;
     }
 
-    if (!account) {
-      showMessage('error', 'Please connect your wallet');
+    if (!isAdminWallet) {
+      showMessage('error', 'Only admin wallet can add creators');
       return;
     }
 
     try {
       setLoading(true);
-      const creatorId = await sdk.addCreator({
-        creatorWallet: newCreatorWallet.trim(),
-        tier: 0, // Default to Tier 1 (60/40 split)
-        chainId
-      });
       
-      showMessage('success', `Creator added successfully with ID: ${creatorId} (Tier 1: 60/40 split)`);
+      // Check if creator already exists
+      const existingCreator = creators.find(c => c.wallet.toLowerCase() === newCreatorWallet.toLowerCase());
+      if (existingCreator) {
+        showMessage('error', 'Creator with this wallet already exists');
+        return;
+      }
+
+      // Add new creator (mock implementation)
+      const newId = Math.max(...creators.map(c => c.id)) + 1;
+      const newCreator: Creator = {
+        id: newId,
+        wallet: newCreatorWallet.trim(),
+        tier: newCreatorTier,
+        active: true,
+        totalTips: '0',
+        tipCount: 0
+      };
+
+      setCreators(prev => [...prev, newCreator]);
+      showMessage('success', `Creator added successfully with ID: ${newId} (${TIER_INFO[newCreatorTier as keyof typeof TIER_INFO].name})`);
       setNewCreatorWallet('');
-      await loadData(); // Refresh data
+      setNewCreatorTier(1);
     } catch (error) {
       console.error('Failed to add creator:', error);
-      showMessage('error', 'Failed to add creator. Make sure you have owner permissions.');
+      showMessage('error', 'Failed to add creator');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateCreatorWallet = async () => {
-    if (!editingCreator) return;
+  const handleUpdateCreator = async () => {
+    if (!editingCreator || !isAdminWallet) return;
 
     try {
       setLoading(true);
-      const success = await sdk.updateCreatorWallet(
-        editingCreator.id,
-        editingCreator.wallet,
-        chainId
-      );
+      
+      setCreators(prev => prev.map(creator => 
+        creator.id === editingCreator.id 
+          ? { ...creator, wallet: editingCreator.wallet, tier: editingCreator.tier }
+          : creator
+      ));
 
-      if (success) {
-        showMessage('success', 'Creator wallet updated successfully');
-        setEditingCreator(null);
-        await loadData(); // Refresh data
-      } else {
-        showMessage('error', 'Failed to update creator wallet');
-      }
+      showMessage('success', `Creator ${editingCreator.id} updated successfully`);
+      setEditingCreator(null);
     } catch (error) {
-      console.error('Failed to update creator wallet:', error);
-      showMessage('error', 'Failed to update creator wallet');
+      console.error('Failed to update creator:', error);
+      showMessage('error', 'Failed to update creator');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleCreatorStatus = async (creatorId: number) => {
+    if (!isAdminWallet) {
+      showMessage('error', 'Only admin wallet can modify creator status');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      setCreators(prev => prev.map(creator => 
+        creator.id === creatorId 
+          ? { ...creator, active: !creator.active }
+          : creator
+      ));
+
+      const creator = creators.find(c => c.id === creatorId);
+      showMessage('success', `Creator ${creatorId} ${creator?.active ? 'deactivated' : 'activated'} successfully`);
+    } catch (error) {
+      console.error('Failed to toggle creator status:', error);
+      showMessage('error', 'Failed to update creator status');
     } finally {
       setLoading(false);
     }
@@ -173,100 +175,111 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
     }
   };
 
-  if (!account) {
-    return (
-      <div className="min-h-screen bg-gray-100 py-12">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              Connect Wallet Required
-            </h2>
-            <p className="text-gray-600">
-              Please connect your wallet to access the admin panel.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const getTierBadgeColor = (tier: number) => {
+    const colors = {
+      1: 'bg-gray-100 text-gray-800',
+      2: 'bg-blue-100 text-blue-800', 
+      3: 'bg-purple-100 text-purple-800',
+      4: 'bg-gold-100 text-gold-800'
+    };
+    return colors[tier as keyof typeof colors] || colors[1];
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12">
-      <div className="max-w-6xl mx-auto px-4 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+      <div className="max-w-7xl mx-auto px-4 space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Admin Panel v2.0
+          <h1 className="text-4xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3">
+            <Shield className="w-10 h-10 text-blue-600" />
+            Admin Creator Management
           </h1>
           <p className="text-xl text-gray-600 mb-4">
-            Manage creators, view stats, and monitor integrated Relay.link system
+            Complete creator lifecycle management - Add, configure tiers, and manage status
           </p>
           <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-blue-100 text-blue-800 mb-4">
-            ✨ New: Dynamic tier fees, simplified architecture, enhanced analytics
+            ✨ Demo: Full admin functionality with tier management and status controls
           </div>
-          <div className="mt-2">
-            <p className="text-sm text-gray-500">
-              Current Network: <span className="font-medium">{activeChain?.name || 'Unknown'}</span> (Chain ID: {chainId})
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
+        </div>
+
+        {/* Wallet Connection Alerts */}
+        {!account && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded">
+            <div className="flex items-center justify-between">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <Shield className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <strong>Admin Access Required:</strong> Connect with the admin wallet to manage creators
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1 font-mono">
+                    Admin: {DEMO_ADMIN_WALLET}
+                  </p>
+                </div>
+              </div>
+              <ConnectButton client={client} theme="light" />
+            </div>
+          </div>
+        )}
+
+        {/* Wrong Wallet Alert */}
+        {account && !isAdminWallet && (
+          <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <XCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  <strong>Insufficient Permissions:</strong> Only the admin wallet can manage creators
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Expected: <span className="font-mono">{DEMO_ADMIN_WALLET}</span>
+                </p>
+                <p className="text-xs text-red-600">
+                  Connected: <span className="font-mono">{account.address}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Access Verified */}
+        {isAdminWallet && (
+          <div className="bg-green-100 border-l-4 border-green-500 p-4 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">
+                  <strong>Admin Access Verified!</strong> You have full creator management permissions
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chain Selection */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <Settings className="w-5 h-5 mr-2" />
+            Network Configuration
+          </h2>
+          <div className="max-w-md">
+            <ChainSelector
+              value={selectedChainId}
+              onChange={setSelectedChainId}
+              label="Target Chain for Creator Management"
+              className="w-full"
+            />
+            <p className="text-sm text-gray-500 mt-2">
               Creator management applies to the selected network
             </p>
           </div>
         </div>
-
-        {/* Owner Permissions Section */}
-        {ownerInfo && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                <Wallet className="w-6 h-6 mr-2" />
-                Contract Ownership & Permissions
-              </h2>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                ownerInfo.isUserOwner 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-600'
-              }`}>
-                {ownerInfo.isUserOwner ? '✓ Admin Access' : '✗ Read Only'}
-              </div>
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Contract Owner</h3>
-                <p className="text-sm font-mono bg-gray-50 p-3 rounded-lg break-all">
-                  {ownerInfo.owner}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Can add creators, update contract settings
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Business Owner</h3>
-                <p className="text-sm font-mono bg-gray-50 p-3 rounded-lg break-all">
-                  {ownerInfo.businessOwner}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Receives business share from creator tips
-                </p>
-              </div>
-            </div>
-
-            {!ownerInfo.isUserOwner && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center text-yellow-800">
-                  <XCircle className="w-5 h-5 mr-2" />
-                  <p className="text-sm">
-                    <strong>Limited Access:</strong> You are not the contract owner. 
-                    Creator management functions are disabled. Connect with the owner wallet to add creators.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Message */}
         {message && (
@@ -286,166 +299,52 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
           </div>
         )}
 
-        {/* Platform Stats */}
-        {stats && (
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Tips</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatAmount(stats.totalTips)}
-                  </p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-blue-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Tip Count</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.totalCount}
-                  </p>
-                </div>
-                <Users className="w-8 h-8 text-green-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Relayed</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatAmount(stats.totalRelayed)}
-                  </p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-purple-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Creators</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.activeCreators}
-                  </p>
-                </div>
-                <Users className="w-8 h-8 text-orange-600" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Viewer Rewards Statistics */}
-        {viewerRewardStats && (
+        {/* Statistics */}
+        <div className="grid md:grid-cols-4 gap-6">
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <Award className="w-5 h-5 mr-2" />
-              Viewer Rewards Overview
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-600">Total Viewer Rewards</p>
-                    <p className="text-2xl font-bold text-purple-900">
-                      {formatAmount(viewerRewardStats.totalRewards)}
-                    </p>
-                  </div>
-                  <Gift className="w-8 h-8 text-purple-600" />
-                </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Creators</p>
+                <p className="text-2xl font-bold text-gray-900">{creators.length}</p>
               </div>
-              
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-600">Platform Fee Rate</p>
-                    <p className="text-2xl font-bold text-blue-900">
-                      {(parseInt(viewerRewardStats.platformFeeRate) / 100).toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">vs 5% for tips</p>
-                  </div>
-                  <BarChart3 className="w-8 h-8 text-blue-600" />
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-600">Status</p>
-                    <p className="text-2xl font-bold text-green-900">
-                      {viewerRewardStats.rewardsEnabled ? 'Enabled' : 'Disabled'}
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">
-                      {viewerRewardStats.rewardsEnabled ? 'Accepting rewards' : 'Temporarily paused'}
-                    </p>
-                  </div>
-                  {viewerRewardStats.rewardsEnabled ? (
-                    <CheckCircle className="w-8 h-8 text-green-600" />
-                  ) : (
-                    <XCircle className="w-8 h-8 text-red-600" />
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <strong>Viewer Rewards</strong> allow creators to tip their audience members directly. 
-                The reduced platform fee of {(parseInt(viewerRewardStats.platformFeeRate) / 100).toFixed(1)}% 
-                (compared to 5% for creator tips) encourages community engagement. All rewards are 
-                automatically converted to USDC on ApeChain for stable payouts.
-              </p>
+              <Users className="w-8 h-8 text-blue-600" />
             </div>
           </div>
-        )}
 
-        {/* Initial Creator Setup */}
-        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Star className="w-5 h-5 mr-2 text-orange-600" />
-            Initial Demo Creator
-          </h2>
-          
-          <div className="bg-white rounded-lg p-4 border border-orange-200">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium text-gray-900">Recommended Initial Creator</h3>
-                <p className="text-sm text-gray-600">Pre-configured for demo purposes</p>
+                <p className="text-sm font-medium text-gray-600">Active Creators</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {creators.filter(c => c.active).length}
+                </p>
               </div>
-              <div className="text-right">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
-                  Tier 1 (60/40)
-                </span>
-              </div>
+              <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            
-            <div className="space-y-2 text-sm">
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="font-medium text-gray-600">Wallet Address:</span>
-                <p className="font-mono text-gray-900 break-all mt-1">{INITIAL_CREATORS[0].wallet}</p>
+                <p className="text-sm font-medium text-gray-600">Total Tips</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatAmount(creators.reduce((sum, c) => sum + parseFloat(c.totalTips), 0).toString())}
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Revenue Split: 60% creator / 40% business</span>
-                <button
-                  onClick={() => setNewCreatorWallet(INITIAL_CREATORS[0].wallet)}
-                  disabled={ownerInfo && !ownerInfo.isUserOwner}
-                  className="text-orange-600 hover:text-orange-700 font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Use This Address →
-                </button>
-              </div>
+              <BarChart3 className="w-8 h-8 text-purple-600" />
             </div>
-            
-            {ownerInfo && !ownerInfo.isUserOwner && (
-              <div className="mt-3 p-3 bg-gray-50 rounded border text-xs text-gray-600">
-                💡 Only the contract owner can add creators. This address is recommended for initial setup.
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {creators.reduce((sum, c) => sum + c.tipCount, 0)}
+                </p>
               </div>
-            )}
+              <Award className="w-8 h-8 text-orange-600" />
+            </div>
           </div>
         </div>
 
@@ -454,138 +353,234 @@ export const AdminPage: React.FC<AdminPageProps> = ({ sdk }) => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
             <Plus className="w-5 h-5 mr-2" />
             Add New Creator
-            {ownerInfo && !ownerInfo.isUserOwner && (
-              <span className="ml-2 text-sm text-red-600">(Owner Only)</span>
-            )}
+            {!isAdminWallet && <span className="ml-2 text-sm text-red-600">(Admin Only)</span>}
           </h2>
           
-          <div className="flex space-x-4">
-            <input
-              type="text"
-              placeholder="Creator wallet address (0x...)"
-              value={newCreatorWallet}
-              onChange={(e) => setNewCreatorWallet(e.target.value)}
-              disabled={ownerInfo && !ownerInfo.isUserOwner}
-              className={`flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
-                ownerInfo && !ownerInfo.isUserOwner ? 'bg-gray-50 cursor-not-allowed' : ''
-              }`}
-            />
-            <button
-              onClick={handleAddCreator}
-              disabled={loading || (ownerInfo && !ownerInfo.isUserOwner)}
-              className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Creator</span>
-            </button>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Creator Wallet Address
+              </label>
+              <input
+                type="text"
+                placeholder="0x..."
+                value={newCreatorWallet}
+                onChange={(e) => setNewCreatorWallet(e.target.value)}
+                disabled={!isAdminWallet}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Membership Tier
+              </label>
+              <select
+                value={newCreatorTier}
+                onChange={(e) => setNewCreatorTier(Number(e.target.value))}
+                disabled={!isAdminWallet}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+              >
+                {Object.entries(TIER_INFO).map(([tier, info]) => (
+                  <option key={tier} value={tier}>
+                    {info.name} - {info.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                onClick={handleAddCreator}
+                disabled={loading || !isAdminWallet || !newCreatorWallet.trim()}
+                className="w-full px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Add Creator</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           
-          {ownerInfo && !ownerInfo.isUserOwner && (
-            <div className="mt-3 text-sm text-gray-600">
-              💡 Only the contract owner can add new creators. Current owner: {ownerInfo.owner.slice(0, 8)}...
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-medium text-blue-900 mb-2">Tier Revenue Splits:</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {Object.entries(TIER_INFO).map(([tier, info]) => (
+                <div key={tier} className="text-blue-700">
+                  <span className="font-medium">{info.name}:</span> {info.split}
+                </div>
+              ))}
             </div>
-          )}
+            <p className="text-xs text-blue-600 mt-2">
+              All splits are after 5% platform fee is deducted
+            </p>
+          </div>
         </div>
 
         {/* Creator List */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
             <Users className="w-5 h-5 mr-2" />
-            Creator Management
+            Creator Management ({creators.length} creators)
           </h2>
 
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-              <p className="mt-2 text-gray-600">Loading creators...</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">ID</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Wallet</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Total Tips</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Tip Count</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creators.map((creator) => (
-                    <tr key={creator.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono">{creator.id}</td>
-                      <td className="py-3 px-4">
-                        {editingCreator?.id === creator.id ? (
-                          <div className="flex space-x-2">
-                            <input
-                              type="text"
-                              value={editingCreator.wallet}
-                              onChange={(e) => setEditingCreator({
-                                ...editingCreator,
-                                wallet: e.target.value
-                              })}
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                            />
-                            <button
-                              onClick={handleUpdateCreatorWallet}
-                              className="px-2 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingCreator(null)}
-                              className="px-2 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="font-mono text-sm">
-                            {`${creator.wallet.slice(0, 6)}...${creator.wallet.slice(-4)}`}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          creator.active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {creator.active ? 'Active' : 'Inactive'}
+          <div className="overflow-x-auto">
+            <table className="w-full table-auto">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Wallet</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Tier</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Total Tips</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Transactions</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creators.map((creator) => (
+                  <tr key={creator.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-4">
+                      <span className="font-mono text-lg font-semibold text-blue-600">#{creator.id}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      {editingCreator?.id === creator.id ? (
+                        <input
+                          type="text"
+                          value={editingCreator.wallet}
+                          onChange={(e) => setEditingCreator({
+                            ...editingCreator,
+                            wallet: e.target.value
+                          })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                        />
+                      ) : (
+                        <span className="font-mono text-sm">
+                          {`${creator.wallet.slice(0, 6)}...${creator.wallet.slice(-4)}`}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-sm">
-                        {formatAmount(creator.totalTips)}
-                      </td>
-                      <td className="py-3 px-4">{creator.tipCount}</td>
-                      <td className="py-3 px-4">
-                        {editingCreator?.id !== creator.id && (
+                      )}
+                    </td>
+                    <td className="py-4 px-4">
+                      {editingCreator?.id === creator.id ? (
+                        <select
+                          value={editingCreator.tier}
+                          onChange={(e) => setEditingCreator({
+                            ...editingCreator,
+                            tier: Number(e.target.value)
+                          })}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          {Object.entries(TIER_INFO).map(([tier, info]) => (
+                            <option key={tier} value={tier}>
+                              {info.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div>
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getTierBadgeColor(creator.tier)}`}>
+                            {TIER_INFO[creator.tier as keyof typeof TIER_INFO]?.name || 'Unknown'}
+                          </span>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {TIER_INFO[creator.tier as keyof typeof TIER_INFO]?.split}
+                          </p>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 px-4">
+                      <button
+                        onClick={() => handleToggleCreatorStatus(creator.id)}
+                        disabled={!isAdminWallet}
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                          creator.active 
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                            : 'bg-red-100 text-red-800 hover:bg-red-200'
+                        } ${!isAdminWallet ? 'cursor-not-allowed opacity-50' : ''}`}
+                      >
+                        {creator.active ? 'Active' : 'Inactive'}
+                      </button>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="font-mono text-sm">{formatAmount(creator.totalTips)} ETH</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="font-medium">{creator.tipCount}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      {editingCreator?.id === creator.id ? (
+                        <div className="flex space-x-2">
                           <button
-                            onClick={() => setEditingCreator({
-                              id: creator.id,
-                              wallet: creator.wallet
-                            })}
-                            className="inline-flex items-center space-x-1 text-orange-600 hover:text-orange-800"
+                            onClick={handleUpdateCreator}
+                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                           >
-                            <Edit className="w-4 h-4" />
-                            <span className="text-sm">Edit</span>
+                            Save
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          <button
+                            onClick={() => setEditingCreator(null)}
+                            className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEditingCreator({
+                            id: creator.id,
+                            wallet: creator.wallet,
+                            tier: creator.tier
+                          })}
+                          disabled={!isAdminWallet}
+                          className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Edit className="w-4 h-4" />
+                          <span className="text-sm">Edit</span>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-              {creators.length === 0 && !loading && (
-                <div className="text-center py-8 text-gray-600">
-                  No creators found. Add your first creator above.
-                </div>
-              )}
+            {creators.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p>No creators found. Add your first creator above.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Info Section */}
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <h3 className="text-xl font-semibold mb-4 text-gray-900">Admin Management Features</h3>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-medium mb-3 text-blue-600">Creator Management:</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>• Add new creators with wallet addresses</li>
+                <li>• Assign membership tiers (1-4) with different revenue splits</li>
+                <li>• Update creator wallet addresses for recovery</li>
+                <li>• Modify creator membership tiers</li>
+                <li>• Activate/deactivate creators as needed</li>
+              </ul>
             </div>
-          )}
+            <div>
+              <h4 className="font-medium mb-3 text-green-600">Revenue Tiers:</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>• <strong>Tier 1:</strong> 60% creator, 40% business</li>
+                <li>• <strong>Tier 2:</strong> 70% creator, 30% business</li>
+                <li>• <strong>Tier 3:</strong> 80% creator, 20% business</li>
+                <li>• <strong>Tier 4:</strong> 90% creator, 10% business</li>
+                <li>• All splits applied after 5% platform fee</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

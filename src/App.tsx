@@ -32,11 +32,11 @@ function App() {
             />
             <Route 
               path="/admin" 
-              element={<AdminPage sdk={sdk} />} 
+              element={<AdminPage client={client} sdk={sdk} />} 
             />
             <Route 
               path="/viewer-rewards" 
-              element={<ViewerRewardsPage sdkConfig={{ client, sdk }} />} 
+              element={<ViewerRewardsPage client={client} sdkConfig={{ client, sdk }} />} 
             />
           </Routes>
         </div>
