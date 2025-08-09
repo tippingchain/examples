@@ -18,6 +18,7 @@ import {
   TokenConfig 
 } from '../data/tokenConfig';
 import type { ApeChainTippingSDK, TipParams, TipResult } from '@tippingchain/sdk';
+import { getContractAddress } from '@tippingchain/sdk';
 
 interface MultiTokenTippingInterfaceProps {
   creatorId: number;
@@ -138,9 +139,34 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     }
 
     // Check if approval is needed for ERC20 tokens
-    if (selectedToken.address) { // ERC20 token
-      // Mock approval check - in real app this would check allowance
-      setApprovalState(ApprovalState.NEEDED);
+    if (selectedToken.address && activeChain) { // ERC20 token
+      // Real approval check using SDK
+      const checkApproval = async () => {
+        try {
+          const contractAddress = getContractAddress(activeChain.id);
+          if (!contractAddress) {
+            setApprovalState(ApprovalState.NONE);
+            return;
+          }
+
+          const amountInWei = (parseFloat(amount) * Math.pow(10, selectedToken.decimals || 18)).toString();
+          const needsApproval = await sdk.needsApproval(
+            selectedToken.address,
+            account.address,
+            contractAddress,
+            amountInWei,
+            activeChain.id
+          );
+          
+          setApprovalState(needsApproval ? ApprovalState.NEEDED : ApprovalState.APPROVED);
+        } catch (error) {
+          console.error('Failed to check approval:', error);
+          // Default to needing approval on error
+          setApprovalState(ApprovalState.NEEDED);
+        }
+      };
+      
+      checkApproval();
     } else { // Native token
       setApprovalState(ApprovalState.NONE);
     }
@@ -219,24 +245,49 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
   }, [amount, selectedToken, activeChain, creatorId, sdk]);
 
   const handleApprove = async () => {
-    if (!selectedToken?.address || !amount) return;
+    if (!selectedToken?.address || !amount || !activeChain || !account) return;
     
     setApprovalState(ApprovalState.PENDING);
     setIsLoading(true);
     
     try {
-      // Mock approval transaction
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setApprovalState(ApprovalState.APPROVED);
+      // Get the contract address for the current chain
+      const contractAddress = getContractAddress(activeChain.id);
+      if (!contractAddress) {
+        throw new Error('Contract not deployed on this chain');
+      }
+
+      // Convert amount to wei for approval
+      const amountInWei = (parseFloat(amount) * Math.pow(10, selectedToken.decimals || 18)).toString();
       
-      // In real implementation:
-      // const tx = await sdk.approveToken(selectedToken.address, amount);
-      // await tx.wait();
+      // Execute real approval transaction via SDK
+      const result = await sdk.approveToken(
+        selectedToken.address,
+        contractAddress,
+        amountInWei,
+        activeChain.id
+      );
+      
+      if (result.success) {
+        setApprovalState(ApprovalState.APPROVED);
+        // Show success message with transaction hash
+        const message = `Token approved successfully! ${result.transactionHash ? `Transaction: ${result.transactionHash.slice(0, 10)}...` : ''}`;
+        console.log('Token approved:', result.transactionHash);
+        onTipSuccess?.({ 
+          success: true, 
+          sourceTransactionHash: result.transactionHash,
+          creatorId: creatorId,
+          estimatedUsdcAmount: '0' 
+        } as TipResult);
+      } else {
+        throw new Error(result.error || 'Approval transaction failed');
+      }
       
     } catch (error) {
       console.error('Approval failed:', error);
       setApprovalState(ApprovalState.NEEDED);
-      onTipError?.('Token approval failed');
+      const errorMessage = error instanceof Error ? error.message : 'Token approval failed';
+      onTipError?.(errorMessage);
     } finally {
       setIsLoading(false);
     }
