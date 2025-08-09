@@ -6,8 +6,8 @@
   "type": "module",
   "dependencies": {
     "@tippingchain/contracts-interface": "^1.2.0",
-    "@tippingchain/sdk": "file:../tippingchain:sdk",
-    "@tippingchain/ui-react": "file:../tippingchain:ui-react",
+    "@tippingchain/sdk": "^2.2.0",
+    "@tippingchain/ui-react": "^2.3.0",
     "@types/react-router-dom": "^5.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.536.0",
