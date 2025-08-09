@@ -52,10 +52,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       return;
     }
 
-    if (!isAdminWallet) {
-      showMessage('error', 'Only admin wallet can add creators');
-      return;
-    }
 
     try {
       setLoading(true);
@@ -91,7 +87,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   };
 
   const handleUpdateCreator = async () => {
-    if (!editingCreator || !isAdminWallet) return;
+    if (!editingCreator || !account) return;
 
     try {
       setLoading(true);
@@ -113,25 +109,42 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   };
 
   const handleToggleCreatorStatus = async (creatorId: number) => {
-    if (!isAdminWallet) {
-      showMessage('error', 'Only admin wallet can modify creator status');
+    if (!account) {
+      showMessage('error', 'Please connect your wallet first');
+      return;
+    }
+
+    if (!isContractAvailable) {
+      showMessage('error', 'Contract not deployed on selected chain');
       return;
     }
 
     try {
       setLoading(true);
       
-      setCreators(prev => prev.map(creator => 
-        creator.id === creatorId 
-          ? { ...creator, active: !creator.active }
-          : creator
-      ));
-
       const creator = creators.find(c => c.id === creatorId);
-      showMessage('success', `Creator ${creatorId} ${creator?.active ? 'deactivated' : 'activated'} successfully`);
+      if (!creator) {
+        showMessage('error', 'Creator not found');
+        return;
+      }
+      
+      // Initialize SDK for selected chain
+      await sdk.initializeForChain(selectedChainId);
+      
+      // Toggle creator status
+      const result = await sdk.setCreatorStatus(creatorId, !creator.active);
+      
+      if (result.success) {
+        showMessage('success', `Creator ${creatorId} ${creator.active ? 'deactivated' : 'activated'} successfully`);
+        
+        // Reload creators to get updated data
+        await loadCreators();
+      } else {
+        showMessage('error', result.error || 'Failed to update creator status');
+      }
     } catch (error) {
       console.error('Failed to toggle creator status:', error);
-      showMessage('error', 'Failed to update creator status');
+      showMessage('error', 'Transaction failed or was rejected');
     } finally {
       setLoading(false);
     }
@@ -192,30 +205,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
           </div>
         )}
 
-        {/* Wrong Wallet Alert */}
-        {account && !isAdminWallet && (
-          <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <XCircle className="h-5 w-5 text-red-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  <strong>Insufficient Permissions:</strong> Only the admin wallet can manage creators
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  Expected: <span className="font-mono">{DEMO_ADMIN_WALLET}</span>
-                </p>
-                <p className="text-xs text-red-600">
-                  Connected: <span className="font-mono">{account.address}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Access Verified */}
-        {isAdminWallet && (
+        {/* Wallet Connected */}
+        {account && isContractAvailable && (
           <div className="bg-green-100 border-l-4 border-green-500 p-4 rounded">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -223,7 +214,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-green-700">
-                  <strong>Admin Access Verified!</strong> You have full creator management permissions
+                  <strong>Wallet Connected!</strong> Connected to {account.address}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Contract: {contractAddress}
                 </p>
               </div>
             </div>
@@ -321,7 +315,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
             <Plus className="w-5 h-5 mr-2" />
             Add New Creator
-            {!isAdminWallet && <span className="ml-2 text-sm text-red-600">(Admin Only)</span>}
+            {(!account || !isContractAvailable) && <span className="ml-2 text-sm text-red-600">(Wallet & Contract Required)</span>}
           </h2>
           
           <div className="grid md:grid-cols-3 gap-4">
@@ -334,7 +328,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
                 placeholder="0x..."
                 value={newCreatorWallet}
                 onChange={(e) => setNewCreatorWallet(e.target.value)}
-                disabled={!isAdminWallet}
+                disabled={!account || !isContractAvailable}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
               />
             </div>
@@ -346,7 +340,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               <select
                 value={newCreatorTier}
                 onChange={(e) => setNewCreatorTier(Number(e.target.value))}
-                disabled={!isAdminWallet}
+                disabled={!account || !isContractAvailable}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
               >
                 {Object.entries(TIER_INFO).map(([tier, info]) => (
@@ -360,7 +354,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <div className="flex items-end">
               <button
                 onClick={handleAddCreator}
-                disabled={loading || !isAdminWallet || !newCreatorWallet.trim()}
+                disabled={loading || !account || !isContractAvailable || !newCreatorWallet.trim()}
                 className="w-full px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {loading ? (
@@ -463,12 +457,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
                     <td className="py-4 px-4">
                       <button
                         onClick={() => handleToggleCreatorStatus(creator.id)}
-                        disabled={!isAdminWallet}
+                        disabled={!account || !isContractAvailable || loading}
                         className={`inline-flex px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
                           creator.active 
                             ? 'bg-green-100 text-green-800 hover:bg-green-200' 
                             : 'bg-red-100 text-red-800 hover:bg-red-200'
-                        } ${!isAdminWallet ? 'cursor-not-allowed opacity-50' : ''}`}
+                        } ${(!account || !isContractAvailable || loading) ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
                         {creator.active ? 'Active' : 'Inactive'}
                       </button>
@@ -502,7 +496,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
                             wallet: creator.wallet,
                             tier: creator.tier
                           })}
-                          disabled={!isAdminWallet}
+                          disabled={!account || !isContractAvailable || loading}
                           className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Edit className="w-4 h-4" />
@@ -536,7 +530,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               <Settings className="w-5 h-5 mr-2 text-blue-600" />
               Supported Tokens Configuration
             </h3>
-            {isAdminWallet && (
+            {account && isContractAvailable && (
               <button
                 onClick={() => {/* Add new token functionality */}}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
