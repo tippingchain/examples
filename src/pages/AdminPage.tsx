@@ -6,7 +6,7 @@ import { ChainSelector } from '@tippingchain/ui-react';
 import type { ApeChainTippingSDK, CreatorRegistration, PlatformStats, MembershipTier } from '@tippingchain/sdk';
 import { getContractAddress, isContractDeployed } from '@tippingchain/contracts-interface';
 import { getTokensForChain } from '../data/tokenConfig';
-import { useTransactionNotifications } from '../components/notifications';
+import { useTransactionNotifications } from '@tippingchain/ui-react';
 
 interface AdminPageProps {
   client: any;
@@ -153,54 +153,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         return;
       }
 
-      // Direct contract interaction to bypass SDK issue
-      const { prepareContractCall, sendTransaction, getContract, defineChain } = await import('thirdweb');
-      const { STREAMING_PLATFORM_TIPPING_ABI } = await import('@tippingchain/contracts-interface');
+      // Use SDK to prepare the transaction
+      const { sendTransaction } = await import('thirdweb');
       
-      // Define Base chain
-      const baseChain = defineChain({
-        id: 8453,
-        name: 'Base',
-        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrls: {
-          default: { http: ['https://mainnet.base.org'] }
-        },
-        blockExplorers: {
-          default: { name: 'BaseScan', url: 'https://basescan.org' }
-        }
+      const preparedTransaction = await sdk.prepareAddCreatorTransaction({
+        creatorWallet: newCreatorWallet.trim(),
+        tier: (newCreatorTier - 1) as any, // SDK expects 0-based tier
+        chainId: selectedChainId
       });
       
-      // Get contract instance
-      const contract = getContract({
-        client,
-        chain: baseChain,
-        address: contractAddress!,
-        abi: STREAMING_PLATFORM_TIPPING_ABI.abi
-      });
-      
-      // Prepare the addCreator call
-      const transaction = prepareContractCall({
-        contract,
-        method: 'addCreator',
-        params: [
-          newCreatorWallet.trim(),           // creatorWallet
-          (newCreatorTier - 1),              // tier (0-based)
-          ''                                 // thirdwebId (empty string)
-        ]
-      });
-      
-      // Send transaction
+      // Send transaction using thirdweb
       const result = await sendTransaction({
-        transaction,
+        transaction: preparedTransaction.transaction,
         account: account!
       });
       
       // Show success notification with transaction hash
-      notifyCreatorAdded(
+      await notifyCreatorAdded(
         nextCreatorId, 
         newCreatorWallet.trim(), 
-        result.transactionHash,
-        selectedChainId
+        newCreatorTier,
+        selectedChainId,
+        result.transactionHash
       );
       
       // Also show traditional message for backward compatibility
@@ -548,13 +522,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             {(!account || !isContractAvailable) && <span className="ml-2 text-sm text-red-600">(Wallet & Contract Required)</span>}
           </h2>
           
-          {/* SDK Issue Notice */}
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          {/* SDK Integration Notice */}
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-start">
-              <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
-                <strong>Direct Contract Integration:</strong> Using direct contract calls due to SDK compatibility issues with current Base deployment.
-                Creator addition bypasses SDK to interact directly with the deployed contract.
+              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-green-800">
+                <strong>SDK Integration:</strong> Using official TippingChain SDK prepareAddCreatorTransaction() method.
+                This provides proper contract interaction with wallet integration for secure creator management.
               </div>
             </div>
           </div>

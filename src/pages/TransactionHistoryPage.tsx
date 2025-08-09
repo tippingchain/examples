@@ -11,9 +11,8 @@ import {
   FileText,
   Settings
 } from 'lucide-react';
-import { TransactionHistory } from '../components/TransactionHistory';
-import { transactionHistoryService } from '../services/transactionHistoryService';
-import { TransactionStats, TransactionHistoryItem } from '../types/transactionHistory';
+import { TransactionHistory, createTransactionHistoryService } from '@tippingchain/ui-react';
+import type { TransactionStats, TransactionHistoryItem } from '@tippingchain/ui-react';
 
 interface TransactionHistoryPageProps {
   client: any;
@@ -26,6 +25,9 @@ export const TransactionHistoryPage: React.FC<TransactionHistoryPageProps> = ({ 
   const [recentTransactions, setRecentTransactions] = useState<TransactionHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Create transaction history service
+  const historyService = createTransactionHistoryService();
+
   useEffect(() => {
     loadPageData();
   }, [account]);
@@ -34,8 +36,8 @@ export const TransactionHistoryPage: React.FC<TransactionHistoryPageProps> = ({ 
     setLoading(true);
     try {
       const [statsData, recentTxs] = await Promise.all([
-        transactionHistoryService.getStats(),
-        transactionHistoryService.getTransactions({ status: 'all' })
+        historyService.getStats(),
+        historyService.getTransactions({ status: 'all' })
       ]);
       
       setStats(statsData);
@@ -49,7 +51,7 @@ export const TransactionHistoryPage: React.FC<TransactionHistoryPageProps> = ({ 
 
   const exportTransactions = async (format: 'csv' | 'json') => {
     try {
-      const transactions = await transactionHistoryService.getTransactions();
+      const transactions = await historyService.getTransactions();
       
       if (format === 'csv') {
         const csvHeaders = [
@@ -275,6 +277,7 @@ export const TransactionHistoryPage: React.FC<TransactionHistoryPageProps> = ({ 
           maxHeight="max-h-screen" // Allow full height since this is a dedicated page
           walletAddress={account?.address}
           className="min-h-96"
+          storageService={historyService}
         />
 
         {/* Recent Activity Summary */}

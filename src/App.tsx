@@ -9,7 +9,8 @@ import { AdminPage } from './pages/AdminPage';
 import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
 import { PlatformStatsPage } from './pages/PlatformStatsPage';
 import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
-import { NotificationProvider } from './components/notifications';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { NotificationProvider } from '@tippingchain/ui-react';
 
 const client = createThirdwebClient({
   clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'df6b18c1d07bf0cc9287b48180157b10'
@@ -49,6 +50,10 @@ function App() {
               <Route 
                 path="/history" 
                 element={<TransactionHistoryPage client={client} sdk={sdk} />} 
+              />
+              <Route 
+                path="/analytics" 
+                element={<AnalyticsPage client={client} sdk={sdk} />} 
               />
             </Routes>
           </div>

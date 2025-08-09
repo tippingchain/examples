@@ -19,7 +19,7 @@ import {
 } from '../data/tokenConfig';
 import type { ApeChainTippingSDK, TipParams, TipResult } from '@tippingchain/sdk';
 import { getContractAddress } from '@tippingchain/sdk';
-import { useTransactionNotifications } from './notifications';
+import { useTransactionNotifications } from '@tippingchain/ui-react';
 
 interface MultiTokenTippingInterfaceProps {
   creatorId: number;
@@ -266,9 +266,6 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     setApprovalState(ApprovalState.PENDING);
     setIsLoading(true);
     
-    // Show pending notification
-    const pendingNotificationId = notifyApprovalPending(selectedToken.symbol);
-    
     try {
       // Get the contract address for the current chain
       const contractAddress = getContractAddress(activeChain.id);
@@ -278,6 +275,15 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
 
       // Convert amount to wei for approval
       const amountInWei = (parseFloat(amount) * Math.pow(10, selectedToken.decimals || 18)).toString();
+      
+      // Show pending notification with simple parameters
+      const pendingNotificationId = await notifyApprovalPending({
+        tokenSymbol: selectedToken.symbol,
+        tokenAddress: selectedToken.address,
+        spenderAddress: contractAddress,
+        amount: amountInWei,
+        chainId: activeChain.id,
+      });
       
       // Execute real approval transaction via SDK
       const result = await sdk.approveToken(
@@ -335,8 +341,15 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     
     setIsLoading(true);
     
-    // Show pending notification
-    const pendingNotificationId = notifyTipPending(amount, selectedToken.symbol, creatorId);
+    // Show pending notification  
+    const pendingNotificationId = await notifyTipPending({
+      tokenSymbol: selectedToken.symbol,
+      tokenAddress: selectedToken.address,
+      amount: amount,
+      chainId: activeChain.id,
+      creatorId: creatorId,
+      creatorWallet: '', // We don't have this readily available
+    });
     
     try {
       // Prepare tip parameters
