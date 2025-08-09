@@ -188,7 +188,7 @@ export const PlatformStatsPage: React.FC<PlatformStatsPageProps> = ({ client, sd
             Platform Analytics
           </h1>
           <p className="text-xl text-gray-600 mb-6">
-            Real-time statistics from TippingChain contracts across 9 blockchains
+            Real-time statistics from TippingChain contracts across blockchains
           </p>
           
           {/* Action Buttons */}

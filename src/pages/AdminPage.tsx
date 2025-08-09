@@ -53,11 +53,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const loadCreators = async () => {
     if (!isContractAvailable) {
       setCreators([]);
+      showMessage('error', `Contract not deployed on selected chain (${selectedChainId}). Only Base (8453) is currently supported.`);
       return;
     }
 
     try {
       setLoadingCreators(true);
+      
+      // First check if contract is actually responsive
+      const contractAddress = getContractAddress(selectedChainId);
+      if (!contractAddress) {
+        throw new Error(`No contract address found for chain ${selectedChainId}`);
+      }
       
       // Get top creators from the platform (this gives us actual creators)
       const topCreators = await sdk.getTopCreators(50, selectedChainId); // Get up to 50 creators
@@ -66,17 +73,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       const loadedCreators: Creator[] = topCreators.map((creator) => ({
         id: creator.id,
         wallet: creator.wallet,
-        tier: creator.tier + 1, // SDK uses 0-based, UI uses 1-based  
+        tier: creator.tier !== undefined ? creator.tier + 1 : 1, // SDK uses 0-based, UI uses 1-based  
         active: creator.active,
-        totalTips: '0', // Will be populated from platform stats if available
-        tipCount: 0 // Will be populated from platform stats if available
+        totalTips: creator.totalTips || '0',
+        tipCount: creator.tipCount || 0
       }));
       
       setCreators(loadedCreators);
+      if (loadedCreators.length === 0) {
+        showMessage('success', 'Contract is available but no creators found. Add your first creator below.');
+      }
     } catch (error) {
       console.error('Failed to load creators:', error);
-      showMessage('error', 'Failed to load creators from contract');
-      // Set empty array on error so UI shows "no creators" state
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Could not resolve method')) {
+        showMessage('error', `Contract method not found. The deployed contract on chain ${selectedChainId} may be an older version.`);
+      } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
+        showMessage('error', `Contract call failed. The contract on chain ${selectedChainId} may not be properly deployed.`);
+      } else {
+        showMessage('error', `Failed to load creators: ${errorMessage}`);
+      }
+      
       setCreators([]);
     } finally {
       setLoadingCreators(false);
@@ -93,6 +111,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       return;
     }
 
+    // Basic wallet address validation
+    if (!newCreatorWallet.startsWith('0x') || newCreatorWallet.length !== 42) {
+      showMessage('error', 'Please enter a valid Ethereum wallet address (0x...)');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -100,12 +123,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       // Check if creator already exists
       const existingCreator = creators.find(c => c.wallet.toLowerCase() === newCreatorWallet.toLowerCase());
       if (existingCreator) {
-        showMessage('error', 'Creator with this wallet already exists');
+        showMessage('error', `Creator with this wallet already exists (ID: ${existingCreator.id})`);
         return;
       }
 
       if (!isContractAvailable) {
-        showMessage('error', 'Contract not deployed on selected chain');
+        showMessage('error', `Contract not deployed on selected chain (${selectedChainId}). Only Base (8453) is currently supported.`);
         return;
       }
 
@@ -119,7 +142,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       // Add creator to contract
       const creatorId = await sdk.addCreator(registration);
       
-      showMessage('success', `Creator added successfully with ID: ${creatorId}`);
+      showMessage('success', `Creator added successfully with ID: ${creatorId} on chain ${selectedChainId}`);
       setNewCreatorWallet('');
       setNewCreatorTier(1);
       
@@ -127,7 +150,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       await loadCreators();
     } catch (error) {
       console.error('Failed to add creator:', error);
-      showMessage('error', 'Failed to add creator');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Could not resolve method')) {
+        showMessage('error', `Contract method not found. The deployed contract on chain ${selectedChainId} may be an older version or not properly deployed.`);
+      } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
+        showMessage('error', `Transaction failed. Check that you have permission to add creators and sufficient gas.`);
+      } else if (errorMessage.includes('user rejected')) {
+        showMessage('error', 'Transaction was cancelled by user');
+      } else {
+        showMessage('error', `Failed to add creator: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -301,6 +334,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <Settings className="w-5 h-5 mr-2" />
             Network Configuration
           </h2>
+          
+          {/* Current deployment status */}
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-amber-800">Limited Deployment Status</h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  Currently, TippingChain contracts are only deployed on <strong>Base (8453)</strong>. 
+                  Other networks will show contract method errors until deployment is completed.
+                </p>
+                <p className="text-xs text-amber-600 mt-2">
+                  ✅ Base (8453) - Contract deployed and fully functional<br/>
+                  ❌ Other networks - Coming soon
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="max-w-md">
             <ChainSelector
               value={selectedChainId}
@@ -311,6 +363,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <p className="text-sm text-gray-500 mt-2">
               Creator management applies to the selected network
             </p>
+            {!isContractAvailable && (
+              <p className="text-sm text-red-600 mt-1 font-medium">
+                ⚠️ Contract not deployed on selected chain
+              </p>
+            )}
+            {isContractAvailable && (
+              <p className="text-sm text-green-600 mt-1 font-medium">
+                ✅ Contract available: {contractAddress?.slice(0, 10)}...
+              </p>
+            )}
           </div>
         </div>
 

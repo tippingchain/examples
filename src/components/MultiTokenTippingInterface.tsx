@@ -49,6 +49,7 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
   const [isLoading, setIsLoading] = useState(false);
   const [approvalState, setApprovalState] = useState<ApprovalState>(ApprovalState.NONE);
   const [conversionQuote, setConversionQuote] = useState<any>(null);
+  const [feePreviewLoading, setFeePreviewLoading] = useState<boolean>(false);
   const [balanceWarning, setBalanceWarning] = useState<string>('');
   
   const chainTokens = activeChain ? getAllTokensForChain(activeChain.id) : [];
@@ -88,61 +89,77 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     }
   }, [selectedToken, amount, userBalance, account]);
 
-  // Get conversion quote
+  // Get real fee preview using SDK
   useEffect(() => {
-    if (!amount || !selectedToken || !activeChain) {
+    if (!amount || !selectedToken || !activeChain || creatorId <= 0) {
       setConversionQuote(null);
       return;
     }
 
-    const getQuote = async () => {
+    const getRealFeePreview = async () => {
+      setFeePreviewLoading(true);
       try {
-        // Mock conversion calculation
-        const amountNum = parseFloat(amount);
-        let usdValue = amountNum;
+        const amountInWei = (parseFloat(amount) * Math.pow(10, selectedToken.decimals || 18)).toString();
         
-        // Mock USD conversion rates
+        // Get real tip splits from SDK
+        const tipSplits = await sdk.calculateTipSplits(creatorId, amountInWei, activeChain.id);
+        
+        // Convert wei amounts back to readable format
+        const platformFeeEth = parseFloat(tipSplits.platformFee) / Math.pow(10, selectedToken.decimals || 18);
+        const creatorAmountEth = parseFloat(tipSplits.creatorAmount) / Math.pow(10, selectedToken.decimals || 18);
+        const businessAmountEth = parseFloat(tipSplits.businessAmount) / Math.pow(10, selectedToken.decimals || 18);
+        
+        // Estimate USD value (rough conversion for display)
         const rates: Record<string, number> = {
-          'ETH': 2400,
-          'MATIC': 0.85,
-          'BNB': 320,
-          'AVAX': 35,
-          'APE': 1.2,
-          'USDC': 1,
-          'USDT': 1,
-          'DAI': 1,
-          'BUSD': 1
+          'ETH': 2400, 'MATIC': 0.85, 'BNB': 320, 'AVAX': 35, 'APE': 1.2,
+          'USDC': 1, 'USDT': 1, 'DAI': 1, 'BUSD': 1
         };
+        const usdRate = rates[selectedToken.symbol] || 1;
+        const totalUsdValue = parseFloat(amount) * usdRate;
+        const estimatedUsdc = totalUsdValue * 0.98; // Rough estimate after relay fees
         
-        const rate = rates[selectedToken.symbol] || 1;
-        usdValue = amountNum * rate;
-        
-        const platformFee = usdValue * 0.05; // 5%
-        const afterPlatformFee = usdValue - platformFee;
-        
-        // Mock tier-based split (assuming Tier 1: 60/40)
-        const creatorShare = afterPlatformFee * 0.6;
-        const businessShare = afterPlatformFee * 0.4;
+        setConversionQuote({
+          inputAmount: parseFloat(amount),
+          inputToken: selectedToken.symbol,
+          usdValue: totalUsdValue,
+          platformFee: platformFeeEth * usdRate,
+          creatorShare: creatorAmountEth * usdRate,
+          businessShare: businessAmountEth * usdRate,
+          estimatedUsdc: estimatedUsdc,
+          relayFee: totalUsdValue * 0.02,
+          // Add raw amounts for display
+          platformFeeRaw: platformFeeEth,
+          creatorShareRaw: creatorAmountEth,
+          businessShareRaw: businessAmountEth,
+          isReal: true
+        });
+      } catch (error) {
+        console.error('Real fee calculation failed:', error);
+        // Fallback to basic calculation if SDK call fails
+        const amountNum = parseFloat(amount);
+        const estimatedUsd = amountNum * (selectedToken.symbol === 'USDC' ? 1 : 2000);
+        const platformFee = estimatedUsd * 0.05;
         
         setConversionQuote({
           inputAmount: amountNum,
           inputToken: selectedToken.symbol,
-          usdValue: usdValue,
+          usdValue: estimatedUsd,
           platformFee: platformFee,
-          creatorShare: creatorShare,
-          businessShare: businessShare,
-          estimatedUsdc: usdValue * 0.98, // Mock relay fee
-          relayFee: usdValue * 0.02
+          creatorShare: (estimatedUsd - platformFee) * 0.7, // Fallback assumption
+          businessShare: (estimatedUsd - platformFee) * 0.3,
+          estimatedUsdc: estimatedUsd * 0.98,
+          relayFee: estimatedUsd * 0.02,
+          error: 'Using estimated fees - unable to fetch real splits',
+          isReal: false
         });
-      } catch (error) {
-        console.error('Quote calculation failed:', error);
-        setConversionQuote(null);
+      } finally {
+        setFeePreviewLoading(false);
       }
     };
 
-    const debounceTimer = setTimeout(getQuote, 500);
+    const debounceTimer = setTimeout(getRealFeePreview, 500);
     return () => clearTimeout(debounceTimer);
-  }, [amount, selectedToken, activeChain]);
+  }, [amount, selectedToken, activeChain, creatorId, sdk]);
 
   const handleApprove = async () => {
     if (!selectedToken?.address || !amount) return;
@@ -332,56 +349,136 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
           </div>
         )}
 
-        {/* Conversion Preview */}
-        {amount && conversionQuote && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center mb-2">
-              <Coins className="w-4 h-4 text-blue-600 mr-1" />
-              <span className="text-sm font-medium text-blue-800">
-                Auto-conversion to USDC on ApeChain
-              </span>
+        {/* Enhanced Fee Preview */}
+        {amount && (feePreviewLoading || conversionQuote) && (
+          <div className={`border rounded-lg p-4 ${
+            conversionQuote?.isReal 
+              ? 'bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200'
+              : 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200'
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <Coins className="w-4 h-4 text-blue-600 mr-1" />
+                <span className="text-sm font-medium text-blue-800">
+                  Real Fee Preview
+                </span>
+              </div>
+              {feePreviewLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : conversionQuote?.isReal ? (
+                <CheckCircle className="w-4 h-4 text-green-600" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-yellow-600" />
+              )}
             </div>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>You send:</span>
-                <span className="font-medium">
-                  {conversionQuote.inputAmount} {conversionQuote.inputToken}
-                </span>
+
+            {feePreviewLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600 mr-2" />
+                <span className="text-sm text-gray-600">Calculating real fees...</span>
               </div>
-              <div className="flex justify-between">
-                <span>USD Value:</span>
-                <span className="font-medium">
-                  ${conversionQuote.usdValue.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-center text-blue-600">
-                <ArrowRight className="w-4 h-4" />
-              </div>
-              <div className="flex justify-between text-red-600">
-                <span>Platform fee (5%):</span>
-                <span className="font-medium">
-                  -${conversionQuote.platformFee.toFixed(2)}
-                </span>
-              </div>
-              <div className="border-t pt-2 space-y-1">
-                <div className="flex justify-between text-green-600">
-                  <span>Creator gets (60%):</span>
-                  <span className="font-medium">
-                    ~${conversionQuote.creatorShare.toFixed(2)} USDC
+            ) : conversionQuote && (
+              <div className="space-y-3">
+                {/* Error Warning */}
+                {conversionQuote.error && (
+                  <div className="bg-yellow-100 border border-yellow-300 rounded p-2">
+                    <div className="text-xs text-yellow-800 font-medium">
+                      ⚠️ {conversionQuote.error}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Input Amount */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700">You send:</span>
+                  <span className="font-semibold">
+                    {conversionQuote.inputAmount} {conversionQuote.inputToken}
                   </span>
                 </div>
-                <div className="flex justify-between text-blue-600">
-                  <span>Business gets (40%):</span>
-                  <span className="font-medium">
-                    ~${conversionQuote.businessShare.toFixed(2)} USDC
+                
+                {/* USD Value */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700">USD Value:</span>
+                  <span className="font-semibold">
+                    ${conversionQuote.usdValue.toFixed(2)}
                   </span>
                 </div>
+
+                <div className="flex justify-center text-blue-600 my-2">
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+
+                {/* Platform Fee */}
+                <div className="flex justify-between text-sm text-red-600">
+                  <span>Platform fee (5%):</span>
+                  <span className="font-semibold">
+                    -{conversionQuote.platformFeeRaw ? `${conversionQuote.platformFeeRaw.toFixed(6)} ${conversionQuote.inputToken}` : `$${conversionQuote.platformFee.toFixed(2)}`}
+                  </span>
+                </div>
+
+                {/* Creator/Business Split */}
+                <div className="border-t pt-2 space-y-2">
+                  <div className="text-xs font-medium text-gray-600 mb-2">
+                    After Platform Fee Distribution:
+                  </div>
+                  
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Creator receives:</span>
+                    <span className="font-semibold">
+                      {conversionQuote.creatorShareRaw ? (
+                        <span>
+                          {conversionQuote.creatorShareRaw.toFixed(6)} {conversionQuote.inputToken}
+                          <span className="text-xs text-gray-500 ml-1">
+                            (~${conversionQuote.creatorShare.toFixed(2)})
+                          </span>
+                        </span>
+                      ) : (
+                        `$${conversionQuote.creatorShare.toFixed(2)}`
+                      )}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm text-blue-600">
+                    <span>Business receives:</span>
+                    <span className="font-semibold">
+                      {conversionQuote.businessShareRaw ? (
+                        <span>
+                          {conversionQuote.businessShareRaw.toFixed(6)} {conversionQuote.inputToken}
+                          <span className="text-xs text-gray-500 ml-1">
+                            (~${conversionQuote.businessShare.toFixed(2)})
+                          </span>
+                        </span>
+                      ) : (
+                        `$${conversionQuote.businessShare.toFixed(2)}`
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Final USDC Estimate */}
+                <div className="border-t pt-2">
+                  <div className="flex justify-between text-sm font-medium">
+                    <span className="text-purple-700">Final USDC on ApeChain:</span>
+                    <span className="text-purple-700">
+                      ~${conversionQuote.estimatedUsdc.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Indicator */}
+                <div className={`text-xs mt-3 p-2 rounded ${
+                  conversionQuote.isReal 
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                }`}>
+                  {conversionQuote.isReal ? (
+                    <span>✅ Real fees calculated from Creator #{creatorId} tier settings</span>
+                  ) : (
+                    <span>⚠️ Estimated fees - actual amounts may differ</span>
+                  )}
+                </div>
               </div>
-              <div className="text-xs text-gray-500 mt-2">
-                * Final amounts may vary due to market conditions and relay fees
-              </div>
-            </div>
+            )}
           </div>
         )}
 
