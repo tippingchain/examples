@@ -2,10 +2,6 @@
 
 Demo application showcasing the TippingChain SDK and UI components for multi-chain tipping with USDC payouts on ApeChain.
 
-## 🌐 Live Demo
-
-The demo app is ready for immediate deployment to GitHub Pages.
-
 ## 🚀 What's New in v2.0
 
 - **🔗 Integrated Relay.link Architecture**: No separate bridge contracts needed - direct integration for simplified deployment
