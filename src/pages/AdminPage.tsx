@@ -35,16 +35,65 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Base default
   const [loading, setLoading] = useState(false);
+  const [loadingCreators, setLoadingCreators] = useState(false);
   const [newCreatorWallet, setNewCreatorWallet] = useState('');
   const [newCreatorTier, setNewCreatorTier] = useState(1);
   const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string; tier: number } | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
 
+  const isContractAvailable = isContractDeployed(selectedChainId);
+  const contractAddress = getContractAddress(selectedChainId);
+
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
   };
+
+  const loadCreators = async () => {
+    if (!isContractAvailable) {
+      setCreators([]);
+      return;
+    }
+
+    try {
+      setLoadingCreators(true);
+      
+      await sdk.initializeForChain(selectedChainId);
+      
+      const creatorCount = await sdk.getCreatorCount();
+      const loadedCreators: Creator[] = [];
+      
+      for (let i = 1; i <= creatorCount; i++) {
+        try {
+          const creator = await sdk.getCreator(i);
+          const analytics = await sdk.getCreatorAnalytics(i);
+          
+          loadedCreators.push({
+            id: i,
+            wallet: creator.wallet,
+            tier: creator.tier + 1, // SDK uses 0-based, UI uses 1-based
+            active: creator.active,
+            totalTips: analytics.totalTips,
+            tipCount: analytics.tipCount
+          });
+        } catch (error) {
+          console.warn(`Failed to load creator ${i}:`, error);
+        }
+      }
+      
+      setCreators(loadedCreators);
+    } catch (error) {
+      console.error('Failed to load creators:', error);
+      showMessage('error', 'Failed to load creators from contract');
+    } finally {
+      setLoadingCreators(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCreators();
+  }, [selectedChainId, sdk]);
 
   const handleAddCreator = async () => {
     if (!newCreatorWallet.trim()) {
@@ -63,21 +112,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         return;
       }
 
-      // Add new creator (mock implementation)
-      const newId = Math.max(...creators.map(c => c.id)) + 1;
-      const newCreator: Creator = {
-        id: newId,
-        wallet: newCreatorWallet.trim(),
-        tier: newCreatorTier,
-        active: true,
-        totalTips: '0',
-        tipCount: 0
-      };
+      if (!isContractAvailable) {
+        showMessage('error', 'Contract not deployed on selected chain');
+        return;
+      }
 
-      setCreators(prev => [...prev, newCreator]);
-      showMessage('success', `Creator added successfully with ID: ${newId} (${TIER_INFO[newCreatorTier as keyof typeof TIER_INFO].name})`);
-      setNewCreatorWallet('');
-      setNewCreatorTier(1);
+      await sdk.initializeForChain(selectedChainId);
+      
+      const result = await sdk.addCreator(newCreatorWallet.trim(), newCreatorTier - 1);
+      
+      if (result.success) {
+        showMessage('success', `Creator added successfully! Tx: ${result.transactionHash}`);
+        setNewCreatorWallet('');
+        setNewCreatorTier(1);
+        
+        await loadCreators();
+      } else {
+        showMessage('error', result.error || 'Failed to add creator');
+      }
     } catch (error) {
       console.error('Failed to add creator:', error);
       showMessage('error', 'Failed to add creator');
@@ -92,14 +144,41 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
     try {
       setLoading(true);
       
-      setCreators(prev => prev.map(creator => 
-        creator.id === editingCreator.id 
-          ? { ...creator, wallet: editingCreator.wallet, tier: editingCreator.tier }
-          : creator
-      ));
-
+      if (!isContractAvailable) {
+        showMessage('error', 'Contract not deployed on selected chain');
+        return;
+      }
+      
+      await sdk.initializeForChain(selectedChainId);
+      
+      const originalCreator = creators.find(c => c.id === editingCreator.id);
+      if (!originalCreator) {
+        showMessage('error', 'Creator not found');
+        return;
+      }
+      
+      let updateResult;
+      
+      if (originalCreator.wallet !== editingCreator.wallet) {
+        updateResult = await sdk.updateCreatorWallet(editingCreator.id, editingCreator.wallet);
+        if (!updateResult.success) {
+          showMessage('error', updateResult.error || 'Failed to update creator wallet');
+          return;
+        }
+      }
+      
+      if (originalCreator.tier !== editingCreator.tier) {
+        updateResult = await sdk.updateCreatorTier(editingCreator.id, editingCreator.tier - 1);
+        if (!updateResult.success) {
+          showMessage('error', updateResult.error || 'Failed to update creator tier');
+          return;
+        }
+      }
+      
       showMessage('success', `Creator ${editingCreator.id} updated successfully`);
       setEditingCreator(null);
+      
+      await loadCreators();
     } catch (error) {
       console.error('Failed to update creator:', error);
       showMessage('error', 'Failed to update creator');
@@ -193,10 +272,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
-                    <strong>Admin Access Required:</strong> Connect with the admin wallet to manage creators
+                    <strong>Wallet Connection Required:</strong> Connect your wallet to manage creators on this network
                   </p>
-                  <p className="text-xs text-yellow-600 mt-1 font-mono">
-                    Admin: {DEMO_ADMIN_WALLET}
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Select a network with deployed contract to begin
                   </p>
                 </div>
               </div>
