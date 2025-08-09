@@ -1,16 +1,16 @@
 // src/pages/AdminPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useActiveAccount, useActiveWalletChain, ConnectButton } from 'thirdweb/react';
-import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star, Settings, Shield } from 'lucide-react';
+import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star, Settings, Shield, AlertCircle, Loader2 } from 'lucide-react';
 import { ChainSelector } from '@tippingchain/ui-react';
 import type { ApeChainTippingSDK } from '@tippingchain/sdk';
+import { getContractAddress, isContractDeployed } from '@tippingchain/contracts-interface';
+import { getTokensForChain } from '../data/tokenConfig';
 
 interface AdminPageProps {
   client: any;
   sdk: ApeChainTippingSDK;
 }
-
-const DEMO_ADMIN_WALLET = '0xf45DFB1B23524C7fcB4dC17851Ce20815123Cec2';
 
 interface Creator {
   id: number;
@@ -20,34 +20,6 @@ interface Creator {
   totalTips: string;
   tipCount: number;
 }
-
-// Mock creator data for demo
-const MOCK_CREATORS: Creator[] = [
-  {
-    id: 1,
-    wallet: '0x479945d7931baC3343967bD0f839f8691E54a66e',
-    tier: 1, // Tier 1: 60/40 split
-    active: true,
-    totalTips: '1500000000000000000', // 1.5 ETH in wei
-    tipCount: 25
-  },
-  {
-    id: 2,
-    wallet: '0x1234567890123456789012345678901234567890',
-    tier: 2, // Tier 2: 70/30 split
-    active: true,
-    totalTips: '750000000000000000', // 0.75 ETH in wei
-    tipCount: 12
-  },
-  {
-    id: 3,
-    wallet: '0x2345678901234567890123456789012345678901',
-    tier: 3, // Tier 3: 80/20 split
-    active: false,
-    totalTips: '0',
-    tipCount: 0
-  }
-];
 
 const TIER_INFO = {
   1: { name: 'Tier 1', split: '60/40', description: '60% Creator / 40% Business' },
@@ -60,7 +32,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const account = useActiveAccount();
   const activeChain = useActiveWalletChain();
   
-  const [creators, setCreators] = useState<Creator[]>(MOCK_CREATORS);
+  const [creators, setCreators] = useState<Creator[]>([]);
   const [selectedChainId, setSelectedChainId] = useState<number>(8453); // Base default
   const [loading, setLoading] = useState(false);
   const [newCreatorWallet, setNewCreatorWallet] = useState('');
@@ -68,7 +40,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string; tier: number } | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const isAdminWallet = account?.address?.toLowerCase() === DEMO_ADMIN_WALLET.toLowerCase();
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -544,10 +515,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               </tbody>
             </table>
 
-            {creators.length === 0 && (
+            {creators.length === 0 && !loadingCreators && (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                <p>No creators found. Add your first creator above.</p>
+                <p>No creators found on this network.</p>
+                {isContractAvailable ? (
+                  <p className="text-sm mt-2">Add your first creator above to get started.</p>
+                ) : (
+                  <p className="text-sm mt-2">Please select a network with a deployed contract.</p>
+                )}
               </div>
             )}
           </div>
@@ -588,134 +564,86 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
 
           {/* Token configuration table */}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Token</th>
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Address</th>
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Decimals</th>
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Type</th>
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Status</th>
-                  <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {/* Mock token data - in real app would come from tokenConfig */}
-                <tr>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center">
-                      <span className="text-lg mr-2">💎</span>
-                      <div>
-                        <div className="font-medium">ETH</div>
-                        <div className="text-sm text-gray-500">Ethereum</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="text-sm text-gray-600">Native Token</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-sm">18</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      Native
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Active
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <button className="text-blue-600 hover:text-blue-800 text-sm">
-                      Configure
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center">
-                      <span className="text-lg mr-2">💵</span>
-                      <div>
-                        <div className="font-medium">USDC</div>
-                        <div className="text-sm text-gray-500">USD Coin</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-xs">0xA0b8...9f15</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-sm">6</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Stablecoin
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Active
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <button className="text-blue-600 hover:text-blue-800 text-sm mr-3">
-                      Configure
-                    </button>
-                    <button className="text-red-600 hover:text-red-800 text-sm">
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center">
-                      <span className="text-lg mr-2">🟡</span>
-                      <div>
-                        <div className="font-medium">DAI</div>
-                        <div className="text-sm text-gray-500">Dai Stablecoin</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-xs">0x6B17...1d0F</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-sm">18</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Stablecoin
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      Testing
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <button className="text-blue-600 hover:text-blue-800 text-sm mr-3">
-                      Configure
-                    </button>
-                    <button className="text-green-600 hover:text-green-800 text-sm mr-3">
-                      Enable
-                    </button>
-                    <button className="text-red-600 hover:text-red-800 text-sm">
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {(() => {
+              const chainTokens = getTokensForChain(selectedChainId);
+              if (!chainTokens) {
+                return (
+                  <div className="text-center py-12 text-gray-500">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <p>No token configuration found for selected chain.</p>
+                  </div>
+                );
+              }
+              
+              const allTokens = [chainTokens.native, ...chainTokens.tokens];
+              
+              return (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Token</th>
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Address</th>
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Decimals</th>
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Type</th>
+                      <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {allTokens.map((token, index) => (
+                      <tr key={index}>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center">
+                            <span className="text-lg mr-2">{token.icon}</span>
+                            <div>
+                              <div className="font-medium">{token.symbol}</div>
+                              <div className="text-sm text-gray-500">{token.name}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="font-mono text-xs">
+                            {token.address ? `${token.address.slice(0, 6)}...${token.address.slice(-4)}` : 'Native Token'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="font-mono text-sm">{token.decimals}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            !token.address 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : token.isStable 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {!token.address ? 'Native' : token.isStable ? 'Stablecoin' : 'ERC20'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            token.popular || token.isStable || !token.address
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {token.popular || token.isStable || !token.address ? 'Active' : 'Available'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
 
           {/* Token management info */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <h4 className="font-medium text-blue-800 mb-2">Token Configuration Notes:</h4>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Native tokens (ETH, MATIC, BNB) are automatically supported</li>
-              <li>• ERC20 tokens require contract addresses and decimal precision</li>
+              <li>• Native tokens are automatically supported on each chain</li>
+              <li>• Popular tokens (USDC, USDT, DAI) are pre-configured and prioritized</li>
+              <li>• All tokens automatically bridge to USDC on ApeChain via Relay.link</li>
+              <li>• Token selection is managed through the main tipping interface</li>
             </ul>
           </div>
         </div>

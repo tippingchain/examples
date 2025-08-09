@@ -187,68 +187,6 @@ export const CHAIN_TOKENS: ChainTokens[] = [
   }
 ];
 
-// Mock token balances for demo wallets
-export const MOCK_TOKEN_BALANCES = {
-  // Demo Tipper Wallet
-  '0x65dF34504D2a5D96f4478544D5279B12b3fbEA87': {
-    [1]: { // Ethereum
-      'native': '2.45',
-      'USDC': '1250.50',
-      'USDT': '890.25',
-      'DAI': '500.0',
-      'WETH': '1.85',
-      'WBTC': '0.025',
-      'UNI': '45.8'
-    },
-    [137]: { // Polygon
-      'native': '156.78',
-      'USDC': '875.25',
-      'USDT': '650.0',
-      'DAI': '300.15',
-      'WETH': '0.95',
-      'WMATIC': '120.5',
-      'AAVE': '12.3'
-    },
-    [8453]: { // Base
-      'native': '3.25',
-      'USDC': '2150.75',
-      'DAI': '800.0',
-      'WETH': '2.15',
-      'cbBTC': '0.035'
-    },
-    [42161]: { // Arbitrum
-      'native': '1.95',
-      'USDC': '1750.0',
-      'USDT': '950.25',
-      'DAI': '450.5',
-      'WETH': '1.65',
-      'ARB': '85.2'
-    },
-    // Add smaller balances for other chains
-    [10]: { 'native': '0.85', 'USDC': '425.0', 'USDT': '300.0', 'DAI': '200.0', 'WETH': '0.65', 'OP': '25.5' },
-    [56]: { 'native': '2.1', 'USDC': '650.0', 'USDT': '500.0', 'BUSD': '400.0', 'WBNB': '1.8', 'ETH': '0.45' },
-    [43114]: { 'native': '15.5', 'USDC': '550.0', 'USDT': '400.0', 'DAI': '250.0', 'WAVAX': '12.8' },
-    [167000]: { 'native': '0.75', 'USDC': '300.0', 'USDT': '200.0', 'WETH': '0.55' },
-    [2741]: { 'native': '1.25', 'USDC': '500.0', 'USDT': '350.0', 'WETH': '0.95' },
-    // Testnets
-    [17000]: { 'native': '5.0', 'USDC': '1000.0', 'DAI': '500.0', 'WETH': '3.5' },
-    [80002]: { 'native': '250.0', 'USDC': '750.0', 'DAI': '400.0', 'WMATIC': '200.0' },
-    [33111]: { 'native': '100.0', 'USDC': '500.0', 'WETH': '2.0' }
-  },
-  // Demo Creator Wallet (smaller balances)
-  '0x479945d7931baC3343967bD0f839f8691E54a66e': {
-    [1]: { 'native': '0.85', 'USDC': '250.0', 'DAI': '150.0', 'WETH': '0.65' },
-    [137]: { 'native': '45.0', 'USDC': '180.0', 'WMATIC': '35.0' },
-    [8453]: { 'native': '1.15', 'USDC': '320.0', 'WETH': '0.85' },
-    [42161]: { 'native': '0.75', 'USDC': '200.0', 'ARB': '25.0' }
-  },
-  // Demo Admin Wallet (decent balances for testing)
-  '0xf45DFB1B23524C7fcB4dC17851Ce20815123Cec2': {
-    [1]: { 'native': '5.0', 'USDC': '5000.0', 'USDT': '3000.0', 'DAI': '2000.0' },
-    [137]: { 'native': '500.0', 'USDC': '2500.0', 'WMATIC': '400.0' },
-    [8453]: { 'native': '8.0', 'USDC': '6000.0', 'DAI': '3000.0' }
-  }
-};
 
 // Helper functions
 export function getTokensForChain(chainId: number): ChainTokens | undefined {
@@ -261,15 +199,6 @@ export function getAllTokensForChain(chainId: number): TokenConfig[] {
   return [chainTokens.native, ...chainTokens.tokens];
 }
 
-export function getTokenBalance(walletAddress: string, chainId: number, tokenSymbol: string): string {
-  const balances = MOCK_TOKEN_BALANCES[walletAddress as keyof typeof MOCK_TOKEN_BALANCES];
-  if (!balances) return '0';
-  
-  const chainBalances = balances[chainId as keyof typeof balances];
-  if (!chainBalances) return '0';
-  
-  return chainBalances[tokenSymbol as keyof typeof chainBalances] || '0';
-}
 
 export function getPopularTokens(chainId: number): TokenConfig[] {
   const allTokens = getAllTokensForChain(chainId);

@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { 
   getAllTokensForChain, 
-  getTokenBalance, 
   formatTokenAmount, 
   isNativeToken,
   TokenConfig 
@@ -52,9 +51,7 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
   const [balanceWarning, setBalanceWarning] = useState<string>('');
   
   const chainTokens = activeChain ? getAllTokensForChain(activeChain.id) : [];
-  const userBalance = selectedToken && account 
-    ? getTokenBalance(account.address, activeChain?.id || 0, selectedToken.symbol)
-    : '0';
+  const userBalance = '0'; // Real token balance would come from SDK/contract query
 
   // Set default token (native) when chain changes
   useEffect(() => {
@@ -250,7 +247,7 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
           </label>
           <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
             {chainTokens.map((token) => {
-              const balance = account ? getTokenBalance(account.address, activeChain?.id || 0, token.symbol) : '0';
+              const balance = '0'; // Real balance would come from SDK/contract query
               const isSelected = selectedToken?.symbol === token.symbol;
               
               return (
