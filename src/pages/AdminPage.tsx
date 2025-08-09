@@ -120,7 +120,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
     try {
       setLoading(true);
       
-      // Check if creator already exists
+      // Check if creator already exists in our loaded list
       const existingCreator = creators.find(c => c.wallet.toLowerCase() === newCreatorWallet.toLowerCase());
       if (existingCreator) {
         showMessage('error', `Creator with this wallet already exists (ID: ${existingCreator.id})`);
@@ -131,29 +131,69 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         showMessage('error', `Contract not deployed on selected chain (${selectedChainId}). Only Base (8453) is currently supported.`);
         return;
       }
+      
+      if (selectedChainId !== 8453) {
+        showMessage('error', 'Direct creator addition is only supported on Base (8453) currently. Please switch to Base chain.');
+        return;
+      }
 
-      // Create registration object for the SDK
-      const registration: CreatorRegistration = {
-        creatorWallet: newCreatorWallet.trim(),
-        tier: (newCreatorTier - 1) as MembershipTier, // SDK uses 0-based tiers
-        chainId: selectedChainId // Only register on selected chain
-      };
+      // Direct contract interaction to bypass SDK issue
+      const { prepareContractCall, sendTransaction, getContract, defineChain } = await import('thirdweb');
+      const { STREAMING_PLATFORM_TIPPING_ABI } = await import('@tippingchain/contracts-interface');
       
-      // Add creator to contract
-      const creatorId = await sdk.addCreator(registration);
+      // Define Base chain
+      const baseChain = defineChain({
+        id: 8453,
+        name: 'Base',
+        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+        rpcUrls: {
+          default: { http: ['https://mainnet.base.org'] }
+        },
+        blockExplorers: {
+          default: { name: 'BaseScan', url: 'https://basescan.org' }
+        }
+      });
       
-      showMessage('success', `Creator added successfully with ID: ${creatorId} on chain ${selectedChainId}`);
+      // Get contract instance
+      const contract = getContract({
+        client,
+        chain: baseChain,
+        address: contractAddress!,
+        abi: STREAMING_PLATFORM_TIPPING_ABI.abi
+      });
+      
+      // Prepare the addCreator call
+      const transaction = prepareContractCall({
+        contract,
+        method: 'addCreator',
+        params: [
+          newCreatorWallet.trim(),           // creatorWallet
+          (newCreatorTier - 1),              // tier (0-based)
+          ''                                 // thirdwebId (empty string)
+        ]
+      });
+      
+      // Send transaction
+      const result = await sendTransaction({
+        transaction,
+        account: account!
+      });
+      
+      showMessage('success', `Creator added successfully! Transaction: ${result.transactionHash.slice(0, 10)}...`);
       setNewCreatorWallet('');
       setNewCreatorTier(1);
       
-      // Reload creators to get updated data
-      await loadCreators();
+      // Wait a bit for transaction to be mined, then reload creators
+      setTimeout(() => {
+        loadCreators();
+      }, 3000);
+      
     } catch (error) {
       console.error('Failed to add creator:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (errorMessage.includes('Could not resolve method')) {
-        showMessage('error', `Contract method not found. The deployed contract on chain ${selectedChainId} may be an older version or not properly deployed.`);
+        showMessage('error', `SDK-Contract Version Mismatch: The SDK is trying to call "getCreatorByWallet" which doesn't exist in the deployed contract version. This suggests the contract on Base may be an earlier version than what the SDK expects.`);
       } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
         showMessage('error', `Transaction failed. Check that you have permission to add creators and sufficient gas.`);
       } else if (errorMessage.includes('user rejected')) {
@@ -450,6 +490,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             Add New Creator
             {(!account || !isContractAvailable) && <span className="ml-2 text-sm text-red-600">(Wallet & Contract Required)</span>}
           </h2>
+          
+          {/* SDK Issue Notice */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <strong>Direct Contract Integration:</strong> Using direct contract calls due to SDK compatibility issues with current Base deployment.
+                Creator addition bypasses SDK to interact directly with the deployed contract.
+              </div>
+            </div>
+          </div>
           
           <div className="grid md:grid-cols-3 gap-4">
             <div>
