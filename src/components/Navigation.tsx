@@ -87,6 +87,16 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
             >
               📈 Advanced Analytics
             </Link>
+            <Link
+              to="/realtime"
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                isActive('/realtime')
+                  ? 'bg-orange-100 text-orange-800'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              ⚡ Real-time Features
+            </Link>
             
             {/* Wallet Connection */}
             <ConnectButton client={client} theme="light" />

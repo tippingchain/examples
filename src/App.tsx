@@ -10,6 +10,7 @@ import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
 import { PlatformStatsPage } from './pages/PlatformStatsPage';
 import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { RealTimePage } from './pages/RealTimePage';
 import { NotificationProvider } from '@tippingchain/ui-react';
 
 const client = createThirdwebClient({
@@ -54,6 +55,10 @@ function App() {
               <Route 
                 path="/analytics" 
                 element={<AnalyticsPage client={client} sdk={sdk} />} 
+              />
+              <Route 
+                path="/realtime" 
+                element={<RealTimePage client={client} sdk={sdk} />} 
               />
             </Routes>
           </div>
