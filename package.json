@@ -5,7 +5,7 @@
   "homepage": "https://tippingchain.github.io/examples/",
   "type": "module",
   "dependencies": {
-    "@tippingchain/sdk": "^2.0.6",
+    "@tippingchain/sdk": "file:../tippingchain:sdk",
     "@tippingchain/ui-react": "^2.0.4",
     "@types/react-router-dom": "^5.3.3",
     "clsx": "^2.1.1",

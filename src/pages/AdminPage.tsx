@@ -40,6 +40,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const [newCreatorTier, setNewCreatorTier] = useState(1);
   const [editingCreator, setEditingCreator] = useState<{ id: number; wallet: string; tier: number } | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [contractOwner, setContractOwner] = useState<string | null>(null);
+  const [checkingPermission, setCheckingPermission] = useState(false);
 
 
   const isContractAvailable = isContractDeployed(selectedChainId);
@@ -48,6 +50,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  const checkContractPermissions = async () => {
+    if (!isContractAvailable || !account) {
+      setContractOwner(null);
+      return;
+    }
+
+    try {
+      setCheckingPermission(true);
+      const owner = await sdk.getOwner(selectedChainId);
+      setContractOwner(owner);
+    } catch (error) {
+      console.error('Failed to check contract ownership:', error);
+      setContractOwner(null);
+    } finally {
+      setCheckingPermission(false);
+    }
   };
 
   const loadCreators = async () => {
@@ -60,39 +80,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
     try {
       setLoadingCreators(true);
       
-      // First check if contract is actually responsive
-      const contractAddress = getContractAddress(selectedChainId);
-      if (!contractAddress) {
-        throw new Error(`No contract address found for chain ${selectedChainId}`);
-      }
+      // Use fixed SDK method to get creators
+      const creatorList = await sdk.getTopCreators(100, selectedChainId);
       
-      // Get top creators from the platform (this gives us actual creators)
-      const topCreators = await sdk.getTopCreators(50, selectedChainId); // Get up to 50 creators
-      
-      // Convert to our Creator interface format
-      const loadedCreators: Creator[] = topCreators.map((creator) => ({
-        id: creator.id,
-        wallet: creator.wallet,
-        tier: creator.tier !== undefined ? creator.tier + 1 : 1, // SDK uses 0-based, UI uses 1-based  
-        active: creator.active,
-        totalTips: creator.totalTips || '0',
-        tipCount: creator.tipCount || 0
+      // Convert to expected Creator type with MembershipTier
+      const formattedCreators = creatorList.map(creator => ({
+        ...creator,
+        tier: (creator.tier || 1) as MembershipTier
       }));
       
-      setCreators(loadedCreators);
-      if (loadedCreators.length === 0) {
-        showMessage('success', 'Contract is available but no creators found. Add your first creator below.');
-      }
+      setCreators(formattedCreators);
+      showMessage('success', `✅ Loaded ${formattedCreators.length} creators successfully using fixed SDK`);
+      
     } catch (error) {
       console.error('Failed to load creators:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (errorMessage.includes('Could not resolve method')) {
-        showMessage('error', `Contract method not found. The deployed contract on chain ${selectedChainId} may be an older version.`);
+        showMessage('error', `Contract method not found. The deployed contract may not support creator listing methods.`);
       } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
-        showMessage('error', `Contract call failed. The contract on chain ${selectedChainId} may not be properly deployed.`);
+        showMessage('error', `Contract call failed. The contract may not be properly deployed or accessible.`);
       } else {
-        showMessage('error', `Failed to load creators: ${errorMessage}`);
+        showMessage('error', `Failed to load creators using SDK: ${errorMessage}`);
       }
       
       setCreators([]);
@@ -103,7 +112,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
 
   useEffect(() => {
     loadCreators();
-  }, [selectedChainId, sdk]);
+    checkContractPermissions();
+  }, [selectedChainId, sdk, account]);
 
   const handleAddCreator = async () => {
     if (!newCreatorWallet.trim()) {
@@ -192,11 +202,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       console.error('Failed to add creator:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      if (errorMessage.includes('Could not resolve method')) {
-        showMessage('error', `SDK-Contract Version Mismatch: The SDK is trying to call "getCreatorByWallet" which doesn't exist in the deployed contract version. This suggests the contract on Base may be an earlier version than what the SDK expects.`);
+      if (errorMessage.includes('OwnableUnauthorizedAccount')) {
+        showMessage('error', `❌ Access Denied: Your wallet (${account?.address?.slice(0, 6)}...${account?.address?.slice(-4)}) does not have permission to add creators. Only the contract owner can add creators to this contract.`);
+      } else if (errorMessage.includes('Could not resolve method')) {
+        showMessage('error', `SDK-Contract Version Mismatch: The SDK is trying to call methods that don't exist in the deployed contract version.`);
       } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
         showMessage('error', `Transaction failed. Check that you have permission to add creators and sufficient gas.`);
-      } else if (errorMessage.includes('user rejected')) {
+      } else if (errorMessage.includes('user rejected') || errorMessage.includes('User rejected')) {
         showMessage('error', 'Transaction was cancelled by user');
       } else {
         showMessage('error', `Failed to add creator: ${errorMessage}`);
@@ -363,6 +375,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
                 <p className="text-xs text-green-600 mt-1">
                   Contract: {contractAddress}
                 </p>
+                {checkingPermission ? (
+                  <p className="text-xs text-blue-600 mt-1">
+                    <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+                    Checking permissions...
+                  </p>
+                ) : contractOwner ? (
+                  <p className="text-xs mt-1">
+                    {contractOwner.toLowerCase() === account.address?.toLowerCase() ? (
+                      <span className="text-green-600 font-medium">✅ You are the contract owner - can add creators</span>
+                    ) : (
+                      <span className="text-red-600 font-medium">❌ Not owner - cannot add creators (Owner: {contractOwner.slice(0, 6)}...{contractOwner.slice(-4)})</span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-yellow-600 mt-1">⚠️ Permission check failed</p>
+                )}
               </div>
             </div>
           </div>
@@ -501,6 +529,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               </div>
             </div>
           </div>
+
+          {/* Permission Notice */}
+          {contractOwner && account && contractOwner.toLowerCase() !== account?.address?.toLowerCase() && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div className="text-sm text-red-800">
+                  <strong>Access Denied:</strong> Only the contract owner can add creators. 
+                  Current owner: <code className="bg-red-100 px-1 rounded text-xs">{contractOwner.slice(0, 10)}...{contractOwner.slice(-6)}</code>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="grid md:grid-cols-3 gap-4">
             <div>
@@ -538,7 +579,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <div className="flex items-end">
               <button
                 onClick={handleAddCreator}
-                disabled={loading || !account || !isContractAvailable || !newCreatorWallet.trim()}
+                disabled={loading || !account || !isContractAvailable || !newCreatorWallet.trim() || (contractOwner && contractOwner.toLowerCase() !== account?.address?.toLowerCase())}
                 className="w-full px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {loading ? (
@@ -570,10 +611,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
 
         {/* Creator List */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            Creator Management ({creators.length} creators)
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Users className="w-5 h-5 mr-2" />
+              Creator Management ({creators.length} creators)
+            </h2>
+            <button
+              onClick={() => loadCreators()}
+              disabled={loadingCreators}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loadingCreators ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              {loadingCreators ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full table-auto">
@@ -693,6 +750,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
               </tbody>
             </table>
 
+            {/* Loading State */}
+            {loadingCreators && (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                <p className="text-gray-600">Loading creators from contract...</p>
+                <p className="text-xs text-gray-500 mt-1">Using direct contract calls</p>
+              </div>
+            )}
+
+            {/* Empty State */}
             {creators.length === 0 && !loadingCreators && (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />

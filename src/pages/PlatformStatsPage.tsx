@@ -24,7 +24,7 @@ import type {
   Creator,
   ViewerRewardsPlatformStats 
 } from '@tippingchain/sdk';
-import { SUPPORTED_CHAINS, getContractAddress, isContractDeployed } from '@tippingchain/contracts-interface';
+import { SUPPORTED_CHAINS, getContractAddress, isContractDeployed } from '@tippingchain/sdk';
 
 interface PlatformStatsPageProps {
   client: any;
