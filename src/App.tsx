@@ -8,6 +8,7 @@ import { TippingPage } from './pages/TippingPage';
 import { AdminPage } from './pages/AdminPage';
 import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
 import { PlatformStatsPage } from './pages/PlatformStatsPage';
+import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
 import { NotificationProvider } from './components/notifications';
 
 const client = createThirdwebClient({
@@ -44,6 +45,10 @@ function App() {
               <Route 
                 path="/viewer-rewards" 
                 element={<ViewerRewardsPage client={client} sdkConfig={{ client, sdk }} />} 
+              />
+              <Route 
+                path="/history" 
+                element={<TransactionHistoryPage client={client} sdk={sdk} />} 
               />
             </Routes>
           </div>

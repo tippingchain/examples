@@ -67,6 +67,16 @@ export const Navigation: React.FC<NavigationProps> = ({ client }) => {
             >
               👑 Admin Manager
             </Link>
+            <Link
+              to="/history"
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                isActive('/history')
+                  ? 'bg-orange-100 text-orange-800'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              🕒 Transaction History
+            </Link>
             
             {/* Wallet Connection */}
             <ConnectButton client={client} theme="light" />

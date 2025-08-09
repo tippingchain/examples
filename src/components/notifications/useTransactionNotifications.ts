@@ -1,10 +1,41 @@
 // src/components/notifications/useTransactionNotifications.ts
 import { useNotifications } from './NotificationProvider';
+import { 
+  transactionHistoryService, 
+  addTipToHistory, 
+  addApprovalToHistory, 
+  addCreatorRegistrationToHistory,
+  updateTransactionSuccess,
+  updateTransactionError
+} from '../../services/transactionHistoryService';
 
 export const useTransactionNotifications = () => {
   const { addNotification, updateNotification } = useNotifications();
 
-  const notifyApprovalPending = (tokenSymbol: string, transactionHash?: string, chainId?: number) => {
+  const notifyApprovalPending = async (
+    tokenSymbol: string, 
+    tokenAddress: string, 
+    spenderAddress: string, 
+    amount: string, 
+    chainId: number,
+    transactionHash?: string
+  ) => {
+    // Add to transaction history
+    const historyId = await addApprovalToHistory({
+      chainId,
+      tokenSymbol,
+      tokenAddress,
+      spenderAddress,
+      amount,
+    });
+    
+    // If we have a transaction hash, update the history immediately
+    if (transactionHash) {
+      await transactionHistoryService.updateTransaction(historyId, {
+        sourceTransactionHash: transactionHash,
+      });
+    }
+    
     return addNotification({
       type: 'pending',
       title: 'Token Approval Pending',
@@ -12,6 +43,12 @@ export const useTransactionNotifications = () => {
       transactionHash,
       chainId,
       duration: 0, // Keep until updated
+      actions: [
+        {
+          label: 'View History',
+          action: () => window.location.href = '/examples/history'
+        }
+      ],
     });
   };
 
@@ -35,7 +72,37 @@ export const useTransactionNotifications = () => {
     });
   };
 
-  const notifyTipPending = (amount: string, tokenSymbol: string, creatorId: number, transactionHash?: string, chainId?: number) => {
+  const notifyTipPending = async (
+    amount: string, 
+    tokenSymbol: string, 
+    creatorId: number, 
+    creatorWallet: string,
+    tokenAddress: string | undefined,
+    chainId: number,
+    estimatedUsdValue?: string,
+    platformFee?: string,
+    transactionHash?: string
+  ) => {
+    // Add to transaction history
+    const historyId = await addTipToHistory({
+      sourceChainId: chainId,
+      creatorId,
+      creatorWallet,
+      tokenSymbol,
+      tokenAddress,
+      amount,
+      amountWei: (parseFloat(amount) * Math.pow(10, 18)).toString(), // Rough conversion
+      estimatedUsdValue,
+      platformFee,
+    });
+    
+    // If we have a transaction hash, update the history immediately
+    if (transactionHash) {
+      await transactionHistoryService.updateTransaction(historyId, {
+        sourceTransactionHash: transactionHash,
+      });
+    }
+    
     return addNotification({
       type: 'pending',
       title: 'Tip Transaction Pending',
@@ -43,6 +110,12 @@ export const useTransactionNotifications = () => {
       transactionHash,
       chainId,
       duration: 0, // Keep until updated
+      actions: [
+        {
+          label: 'View History',
+          action: () => window.location.href = '/examples/history'
+        }
+      ],
     });
   };
 
@@ -77,7 +150,28 @@ export const useTransactionNotifications = () => {
     });
   };
 
-  const notifyCreatorAdded = (creatorId: number, wallet: string, transactionHash?: string, chainId?: number) => {
+  const notifyCreatorAdded = async (
+    creatorId: number, 
+    wallet: string, 
+    membershipTier: number,
+    chainId: number,
+    transactionHash?: string
+  ) => {
+    // Add to transaction history
+    if (transactionHash) {
+      const historyId = await addCreatorRegistrationToHistory({
+        chainId,
+        creatorWallet: wallet,
+        membershipTier,
+      });
+      
+      await transactionHistoryService.updateTransaction(historyId, {
+        status: 'success',
+        sourceTransactionHash: transactionHash,
+        registeredCreatorId: creatorId,
+      });
+    }
+    
     return addNotification({
       type: 'success',
       title: 'Creator Added Successfully',
@@ -85,6 +179,12 @@ export const useTransactionNotifications = () => {
       transactionHash,
       chainId,
       duration: 6000,
+      actions: [
+        {
+          label: 'View History',
+          action: () => window.location.href = '/examples/history'
+        }
+      ],
     });
   };
 
