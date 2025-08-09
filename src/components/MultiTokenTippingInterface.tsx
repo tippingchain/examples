@@ -51,9 +51,54 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
   const [conversionQuote, setConversionQuote] = useState<any>(null);
   const [feePreviewLoading, setFeePreviewLoading] = useState<boolean>(false);
   const [balanceWarning, setBalanceWarning] = useState<string>('');
+  const [userBalance, setUserBalance] = useState<string>('0');
+  const [loadingBalance, setLoadingBalance] = useState<boolean>(false);
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
   
   const chainTokens = activeChain ? getAllTokensForChain(activeChain.id) : [];
-  const userBalance = '0'; // Real token balance would come from SDK/contract query
+
+  // Load all token balances for the current chain
+  const loadTokenBalances = async () => {
+    if (!account?.address || !activeChain || chainTokens.length === 0) {
+      setTokenBalances({});
+      return;
+    }
+
+    setLoadingBalance(true);
+    try {
+      // Get token addresses for balance checking
+      const tokenAddresses = chainTokens.map(token => token.address || 'native');
+      
+      // Load all balances in parallel using the new SDK method
+      const balances = await sdk.getMultipleTokenBalances(account.address, tokenAddresses, activeChain.id);
+      
+      // Map balances to token symbols for easier lookup
+      const balancesBySymbol: Record<string, string> = {};
+      chainTokens.forEach((token, index) => {
+        const tokenAddress = tokenAddresses[index];
+        balancesBySymbol[token.symbol] = balances[tokenAddress] || '0';
+      });
+      
+      setTokenBalances(balancesBySymbol);
+      
+      // Update the selected token balance
+      if (selectedToken) {
+        setUserBalance(balancesBySymbol[selectedToken.symbol] || '0');
+      }
+      
+    } catch (error) {
+      console.error('Failed to load token balances:', error);
+      // Set all balances to 0 on error
+      const emptyBalances: Record<string, string> = {};
+      chainTokens.forEach(token => {
+        emptyBalances[token.symbol] = '0';
+      });
+      setTokenBalances(emptyBalances);
+      setUserBalance('0');
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
 
   // Set default token (native) when chain changes
   useEffect(() => {
@@ -61,6 +106,18 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       setSelectedToken(chainTokens[0]); // First token is always native
     }
   }, [chainTokens, selectedToken]);
+
+  // Load all token balances when account or chain changes
+  useEffect(() => {
+    loadTokenBalances();
+  }, [account?.address, activeChain?.id, chainTokens.length]);
+
+  // Update selected token balance when token selection changes
+  useEffect(() => {
+    if (selectedToken && tokenBalances[selectedToken.symbol]) {
+      setUserBalance(tokenBalances[selectedToken.symbol]);
+    }
+  }, [selectedToken, tokenBalances]);
 
   // Check balance and approval when token/amount changes
   useEffect(() => {
@@ -256,12 +313,25 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       {/* Token Selection */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Token
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Select Token
+            </label>
+            <button
+              onClick={loadTokenBalances}
+              disabled={loadingBalance}
+              className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center"
+              title="Refresh balances"
+            >
+              <svg className={`w-3 h-3 mr-1 ${loadingBalance ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
             {chainTokens.map((token) => {
-              const balance = '0'; // Real balance would come from SDK/contract query
+              const balance = tokenBalances[token.symbol] || '0';
               const isSelected = selectedToken?.symbol === token.symbol;
               
               return (
@@ -286,7 +356,11 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
                     <Wallet className="w-3 h-3 inline mr-1" />
-                    {formatTokenAmount(balance, token.decimals)}
+                    {loadingBalance ? (
+                      <span className="animate-pulse">Loading...</span>
+                    ) : (
+                      formatTokenAmount(balance, token.decimals)
+                    )}
                   </div>
                   {token.isStable && (
                     <div className="text-xs text-green-600 font-medium mt-1">
