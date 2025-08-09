@@ -7,6 +7,7 @@ import { Navigation } from './components/Navigation';
 import { TippingPage } from './pages/TippingPage';
 import { AdminPage } from './pages/AdminPage';
 import { ViewerRewardsPage } from './pages/ViewerRewardsPage';
+import { PlatformStatsPage } from './pages/PlatformStatsPage';
 
 const client = createThirdwebClient({
   clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'df6b18c1d07bf0cc9287b48180157b10'
@@ -29,6 +30,10 @@ function App() {
             <Route 
               path="/" 
               element={<TippingPage client={client} sdk={sdk} />} 
+            />
+            <Route 
+              path="/platform-stats" 
+              element={<PlatformStatsPage client={client} sdk={sdk} />} 
             />
             <Route 
               path="/admin" 

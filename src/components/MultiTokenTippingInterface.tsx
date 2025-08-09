@@ -17,12 +17,13 @@ import {
   isNativeToken,
   TokenConfig 
 } from '../data/tokenConfig';
+import type { ApeChainTippingSDK, TipParams, TipResult } from '@tippingchain/sdk';
 
 interface MultiTokenTippingInterfaceProps {
   creatorId: number;
   client: any;
-  sdk: any;
-  onTipSuccess?: (result: any) => void;
+  sdk: ApeChainTippingSDK;
+  onTipSuccess?: (result: TipResult) => void;
   onTipError?: (error: string) => void;
 }
 
@@ -173,36 +174,32 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     setIsLoading(true);
     
     try {
-      // Mock tip transaction
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const result = {
-        success: true,
-        transactionHash: '0x1234567890abcdef...',
-        amount: amount,
-        token: selectedToken.symbol,
-        estimatedUsdc: conversionQuote?.estimatedUsdc || 0,
-        creatorId: creatorId
+      // Prepare tip parameters
+      const tipParams: TipParams = {
+        sourceChainId: activeChain.id,
+        creatorId: creatorId,
+        token: selectedToken.address || 'native', // 'native' for ETH/native tokens
+        amount: amount // Amount in token units (e.g., "1.5" for 1.5 ETH)
       };
       
-      onTipSuccess?.(result);
+      // Send the tip via SDK
+      const result = await sdk.sendTip(tipParams);
       
-      // Reset form
-      setAmount('');
-      setConversionQuote(null);
-      setApprovalState(ApprovalState.NONE);
-      
-      // In real implementation:
-      // const result = await sdk.sendTip({
-      //   creatorId,
-      //   token: selectedToken.address || 'native',
-      //   amount,
-      //   chainId: activeChain.id
-      // });
+      if (result.success) {
+        onTipSuccess?.(result);
+        
+        // Reset form
+        setAmount('');
+        setConversionQuote(null);
+        setApprovalState(ApprovalState.NONE);
+      } else {
+        throw new Error(result.error || 'Tip transaction failed');
+      }
       
     } catch (error) {
       console.error('Tip failed:', error);
-      onTipError?.('Tip transaction failed');
+      const errorMessage = error instanceof Error ? error.message : 'Transaction failed or was rejected';
+      onTipError?.(errorMessage);
     } finally {
       setIsLoading(false);
     }

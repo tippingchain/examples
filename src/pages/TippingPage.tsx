@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { ChainSelector } from '@tippingchain/ui-react';
 import { useActiveWalletChain, useActiveAccount, ConnectButton } from 'thirdweb/react';
-import { Play, Pause, Users, Eye, Heart, DollarSign } from 'lucide-react';
+import { Play, Pause, Users, Eye, Heart, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import { MultiTokenTippingInterface } from '../components/MultiTokenTippingInterface';
+import type { ApeChainTippingSDK, TipResult } from '@tippingchain/sdk';
 
 interface TippingPageProps {
   client: any;
-  sdk: any;
+  sdk: ApeChainTippingSDK;
 }
 
 const DEMO_CREATOR_WALLET = '0x479945d7931baC3343967bD0f839f8691E54a66e';
@@ -20,6 +21,7 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
   const [selectedChainId, setSelectedChainId] = useState<number | undefined>(defaultChainId);
   const [isPlaying, setIsPlaying] = useState(false);
   const [viewerCount, setViewerCount] = useState(1247);
+  const [tipMessage, setTipMessage] = useState<{ type: 'success' | 'error'; text: string; result?: TipResult } | null>(null);
 
   React.useEffect(() => {
     if (activeChain && !selectedChainId) {
@@ -226,11 +228,22 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
                 sdk={sdk}
                 onTipSuccess={(result) => {
                   console.log('Tip successful:', result);
-                  // Could add success toast or animation here
+                  setTipMessage({ 
+                    type: 'success', 
+                    text: `Tip sent successfully! Transaction: ${result.sourceTransactionHash?.slice(0, 10)}...`, 
+                    result 
+                  });
+                  // Clear message after 5 seconds
+                  setTimeout(() => setTipMessage(null), 5000);
                 }}
                 onTipError={(error) => {
                   console.error('Tip failed:', error);
-                  // Could add error toast here
+                  setTipMessage({ 
+                    type: 'error', 
+                    text: `Tip failed: ${error}` 
+                  });
+                  // Clear message after 5 seconds  
+                  setTimeout(() => setTipMessage(null), 5000);
                 }}
               />
             ) : (
@@ -238,6 +251,36 @@ export const TippingPage: React.FC<TippingPageProps> = ({ client, sdk }) => {
                 <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                 <p className="text-gray-600 font-medium mb-2">Multi-Token Tipping Interface Locked</p>
                 <p className="text-sm text-gray-500">Connect with the demo tipper wallet to unlock multi-token tipping functionality</p>
+              </div>
+            )}
+
+            {/* Tip Success/Error Message */}
+            {tipMessage && (
+              <div className={`mt-6 p-4 rounded-lg border flex items-center space-x-3 ${
+                tipMessage.type === 'success' 
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                {tipMessage.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <p className="font-medium">{tipMessage.text}</p>
+                  {tipMessage.result && tipMessage.result.estimatedUsdcAmount && (
+                    <p className="text-sm mt-1">
+                      Estimated USDC value: ~${tipMessage.result.estimatedUsdcAmount} 
+                      {tipMessage.result.relayId && ` • Relay ID: ${tipMessage.result.relayId}`}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setTipMessage(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ×
+                </button>
               </div>
             )}
           </div>
