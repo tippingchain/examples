@@ -19,6 +19,7 @@ import {
 } from '../data/tokenConfig';
 import type { ApeChainTippingSDK, TipParams, TipResult } from '@tippingchain/sdk';
 import { getContractAddress } from '@tippingchain/sdk';
+import { useTransactionNotifications } from './notifications';
 
 interface MultiTokenTippingInterfaceProps {
   creatorId: number;
@@ -44,6 +45,16 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
 }) => {
   const account = useActiveAccount();
   const activeChain = useActiveWalletChain();
+  const {
+    notifyApprovalPending,
+    notifyApprovalSuccess,
+    notifyApprovalError,
+    notifyTipPending,
+    notifyTipSuccess,
+    notifyTipError,
+    notifyBalanceRefresh,
+    updateNotificationStatus
+  } = useTransactionNotifications();
   
   const [selectedToken, setSelectedToken] = useState<TokenConfig | null>(null);
   const [amount, setAmount] = useState('');
@@ -59,7 +70,7 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
   const chainTokens = activeChain ? getAllTokensForChain(activeChain.id) : [];
 
   // Load all token balances for the current chain
-  const loadTokenBalances = async () => {
+  const loadTokenBalances = async (showNotification = false) => {
     if (!account?.address || !activeChain || chainTokens.length === 0) {
       setTokenBalances({});
       return;
@@ -85,6 +96,11 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       // Update the selected token balance
       if (selectedToken) {
         setUserBalance(balancesBySymbol[selectedToken.symbol] || '0');
+      }
+      
+      // Show notification if it's a manual refresh
+      if (showNotification) {
+        notifyBalanceRefresh();
       }
       
     } catch (error) {
@@ -250,6 +266,9 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     setApprovalState(ApprovalState.PENDING);
     setIsLoading(true);
     
+    // Show pending notification
+    const pendingNotificationId = notifyApprovalPending(selectedToken.symbol);
+    
     try {
       // Get the contract address for the current chain
       const contractAddress = getContractAddress(activeChain.id);
@@ -270,9 +289,17 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       
       if (result.success) {
         setApprovalState(ApprovalState.APPROVED);
-        // Show success message with transaction hash
-        const message = `Token approved successfully! ${result.transactionHash ? `Transaction: ${result.transactionHash.slice(0, 10)}...` : ''}`;
-        console.log('Token approved:', result.transactionHash);
+        
+        // Update pending notification to success
+        updateNotificationStatus(
+          pendingNotificationId,
+          'success',
+          'Token Approved Successfully! ✅',
+          `${selectedToken.symbol} is now approved for spending`,
+          result.transactionHash
+        );
+        
+        // Also show success via traditional callback if provided
         onTipSuccess?.({ 
           success: true, 
           sourceTransactionHash: result.transactionHash,
@@ -287,6 +314,16 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       console.error('Approval failed:', error);
       setApprovalState(ApprovalState.NEEDED);
       const errorMessage = error instanceof Error ? error.message : 'Token approval failed';
+      
+      // Update pending notification to error
+      updateNotificationStatus(
+        pendingNotificationId,
+        'error',
+        'Token Approval Failed',
+        errorMessage
+      );
+      
+      // Also notify via traditional callback if provided
       onTipError?.(errorMessage);
     } finally {
       setIsLoading(false);
@@ -297,6 +334,9 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     if (!selectedToken || !amount || !account || !activeChain) return;
     
     setIsLoading(true);
+    
+    // Show pending notification
+    const pendingNotificationId = notifyTipPending(amount, selectedToken.symbol, creatorId);
     
     try {
       // Prepare tip parameters
@@ -311,12 +351,25 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
       const result = await sdk.sendTip(tipParams);
       
       if (result.success) {
+        // Update pending notification to success
+        updateNotificationStatus(
+          pendingNotificationId,
+          'success',
+          'Tip Sent Successfully! 🎉',
+          `${amount} ${selectedToken.symbol} sent to Creator #${creatorId}${result.estimatedUsdcAmount ? `. Estimated USDC: ~$${result.estimatedUsdcAmount}` : ''}`,
+          result.sourceTransactionHash
+        );
+        
+        // Traditional callback
         onTipSuccess?.(result);
         
         // Reset form
         setAmount('');
         setConversionQuote(null);
         setApprovalState(ApprovalState.NONE);
+        
+        // Refresh balances after successful tip
+        loadTokenBalances();
       } else {
         throw new Error(result.error || 'Tip transaction failed');
       }
@@ -324,6 +377,16 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
     } catch (error) {
       console.error('Tip failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Transaction failed or was rejected';
+      
+      // Update pending notification to error
+      updateNotificationStatus(
+        pendingNotificationId,
+        'error',
+        'Tip Transaction Failed',
+        `Failed to send ${amount} ${selectedToken.symbol} to Creator #${creatorId}: ${errorMessage}`
+      );
+      
+      // Traditional callback
       onTipError?.(errorMessage);
     } finally {
       setIsLoading(false);
@@ -369,7 +432,7 @@ export const MultiTokenTippingInterface: React.FC<MultiTokenTippingInterfaceProp
               Select Token
             </label>
             <button
-              onClick={loadTokenBalances}
+              onClick={() => loadTokenBalances(true)}
               disabled={loadingBalance}
               className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center"
               title="Refresh balances"

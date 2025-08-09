@@ -6,6 +6,7 @@ import { ChainSelector } from '@tippingchain/ui-react';
 import type { ApeChainTippingSDK, CreatorRegistration, PlatformStats, MembershipTier } from '@tippingchain/sdk';
 import { getContractAddress, isContractDeployed } from '@tippingchain/contracts-interface';
 import { getTokensForChain } from '../data/tokenConfig';
+import { useTransactionNotifications } from '../components/notifications';
 
 interface AdminPageProps {
   client: any;
@@ -43,6 +44,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
   const [contractOwner, setContractOwner] = useState<string | null>(null);
   const [checkingPermission, setCheckingPermission] = useState(false);
 
+  // Notification hooks
+  const { notifyCreatorAdded, notifyCreatorError } = useTransactionNotifications();
 
   const isContractAvailable = isContractDeployed(selectedChainId);
   const contractAddress = getContractAddress(selectedChainId);
@@ -117,15 +120,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
 
   const handleAddCreator = async () => {
     if (!newCreatorWallet.trim()) {
-      showMessage('error', 'Please enter a valid wallet address');
+      notifyCreatorError('Please enter a valid wallet address');
       return;
     }
 
     // Basic wallet address validation
     if (!newCreatorWallet.startsWith('0x') || newCreatorWallet.length !== 42) {
-      showMessage('error', 'Please enter a valid Ethereum wallet address (0x...)');
+      notifyCreatorError('Please enter a valid Ethereum wallet address (0x...)');
       return;
     }
+
+    // Predict creator ID for the notification (we'll get it from loading after transaction)
+    const nextCreatorId = creators.length > 0 ? Math.max(...creators.map(c => c.id)) + 1 : 1;
 
     try {
       setLoading(true);
@@ -133,17 +139,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       // Check if creator already exists in our loaded list
       const existingCreator = creators.find(c => c.wallet.toLowerCase() === newCreatorWallet.toLowerCase());
       if (existingCreator) {
-        showMessage('error', `Creator with this wallet already exists (ID: ${existingCreator.id})`);
+        notifyCreatorError(`Creator with this wallet already exists (ID: ${existingCreator.id})`);
         return;
       }
 
       if (!isContractAvailable) {
-        showMessage('error', `Contract not deployed on selected chain (${selectedChainId}). Only Base (8453) is currently supported.`);
+        notifyCreatorError(`Contract not deployed on selected chain (${selectedChainId}). Only Base (8453) is currently supported.`);
         return;
       }
       
       if (selectedChainId !== 8453) {
-        showMessage('error', 'Direct creator addition is only supported on Base (8453) currently. Please switch to Base chain.');
+        notifyCreatorError('Direct creator addition is only supported on Base (8453) currently. Please switch to Base chain.');
         return;
       }
 
@@ -189,7 +195,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         account: account!
       });
       
+      // Show success notification with transaction hash
+      notifyCreatorAdded(
+        nextCreatorId, 
+        newCreatorWallet.trim(), 
+        result.transactionHash,
+        selectedChainId
+      );
+      
+      // Also show traditional message for backward compatibility
       showMessage('success', `Creator added successfully! Transaction: ${result.transactionHash.slice(0, 10)}...`);
+      
       setNewCreatorWallet('');
       setNewCreatorTier(1);
       
@@ -202,6 +218,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       console.error('Failed to add creator:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
+      if (errorMessage.includes('OwnableUnauthorizedAccount')) {
+        notifyCreatorError(`Access Denied: Your wallet (${account?.address?.slice(0, 6)}...${account?.address?.slice(-4)}) does not have permission to add creators. Only the contract owner can add creators to this contract.`);
+      } else if (errorMessage.includes('Could not resolve method')) {
+        notifyCreatorError(`SDK-Contract Version Mismatch: The SDK is trying to call methods that don't exist in the deployed contract version.`);
+      } else if (errorMessage.includes('call reverted') || errorMessage.includes('execution reverted')) {
+        notifyCreatorError(`Transaction failed. Check that you have permission to add creators and sufficient gas.`);
+      } else if (errorMessage.includes('user rejected') || errorMessage.includes('User rejected')) {
+        notifyCreatorError('Transaction was cancelled by user');
+      } else {
+        notifyCreatorError(`Failed to add creator: ${errorMessage}`);
+      }
+      
+      // Keep traditional message for backward compatibility  
       if (errorMessage.includes('OwnableUnauthorizedAccount')) {
         showMessage('error', `❌ Access Denied: Your wallet (${account?.address?.slice(0, 6)}...${account?.address?.slice(-4)}) does not have permission to add creators. Only the contract owner can add creators to this contract.`);
       } else if (errorMessage.includes('Could not resolve method')) {
