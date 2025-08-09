@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useActiveAccount, useActiveWalletChain, ConnectButton } from 'thirdweb/react';
 import { Plus, Edit, Users, BarChart3, Wallet, CheckCircle, XCircle, Award, Gift, Star, Settings, Shield, AlertCircle, Loader2 } from 'lucide-react';
 import { ChainSelector } from '@tippingchain/ui-react';
-import type { ApeChainTippingSDK } from '@tippingchain/sdk';
+import type { ApeChainTippingSDK, CreatorRegistration, PlatformStats, MembershipTier } from '@tippingchain/sdk';
 import { getContractAddress, isContractDeployed } from '@tippingchain/contracts-interface';
 import { getTokensForChain } from '../data/tokenConfig';
 
@@ -59,33 +59,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
     try {
       setLoadingCreators(true);
       
-      await sdk.initializeForChain(selectedChainId);
+      // Get top creators from the platform (this gives us actual creators)
+      const topCreators = await sdk.getTopCreators(50, selectedChainId); // Get up to 50 creators
       
-      const creatorCount = await sdk.getCreatorCount();
-      const loadedCreators: Creator[] = [];
-      
-      for (let i = 1; i <= creatorCount; i++) {
-        try {
-          const creator = await sdk.getCreator(i);
-          const analytics = await sdk.getCreatorAnalytics(i);
-          
-          loadedCreators.push({
-            id: i,
-            wallet: creator.wallet,
-            tier: creator.tier + 1, // SDK uses 0-based, UI uses 1-based
-            active: creator.active,
-            totalTips: analytics.totalTips,
-            tipCount: analytics.tipCount
-          });
-        } catch (error) {
-          console.warn(`Failed to load creator ${i}:`, error);
-        }
-      }
+      // Convert to our Creator interface format
+      const loadedCreators: Creator[] = topCreators.map((creator) => ({
+        id: creator.id,
+        wallet: creator.wallet,
+        tier: creator.tier + 1, // SDK uses 0-based, UI uses 1-based  
+        active: creator.active,
+        totalTips: '0', // Will be populated from platform stats if available
+        tipCount: 0 // Will be populated from platform stats if available
+      }));
       
       setCreators(loadedCreators);
     } catch (error) {
       console.error('Failed to load creators:', error);
       showMessage('error', 'Failed to load creators from contract');
+      // Set empty array on error so UI shows "no creators" state
+      setCreators([]);
     } finally {
       setLoadingCreators(false);
     }
@@ -117,19 +109,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         return;
       }
 
-      await sdk.initializeForChain(selectedChainId);
+      // Create registration object for the SDK
+      const registration: CreatorRegistration = {
+        creatorWallet: newCreatorWallet.trim(),
+        tier: (newCreatorTier - 1) as MembershipTier, // SDK uses 0-based tiers
+        chainId: selectedChainId // Only register on selected chain
+      };
       
-      const result = await sdk.addCreator(newCreatorWallet.trim(), newCreatorTier - 1);
+      // Add creator to contract
+      const creatorId = await sdk.addCreator(registration);
       
-      if (result.success) {
-        showMessage('success', `Creator added successfully! Tx: ${result.transactionHash}`);
-        setNewCreatorWallet('');
-        setNewCreatorTier(1);
-        
-        await loadCreators();
-      } else {
-        showMessage('error', result.error || 'Failed to add creator');
-      }
+      showMessage('success', `Creator added successfully with ID: ${creatorId}`);
+      setNewCreatorWallet('');
+      setNewCreatorTier(1);
+      
+      // Reload creators to get updated data
+      await loadCreators();
     } catch (error) {
       console.error('Failed to add creator:', error);
       showMessage('error', 'Failed to add creator');
@@ -149,28 +144,34 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         return;
       }
       
-      await sdk.initializeForChain(selectedChainId);
-      
       const originalCreator = creators.find(c => c.id === editingCreator.id);
       if (!originalCreator) {
         showMessage('error', 'Creator not found');
         return;
       }
       
-      let updateResult;
-      
+      // Update wallet if changed
       if (originalCreator.wallet !== editingCreator.wallet) {
-        updateResult = await sdk.updateCreatorWallet(editingCreator.id, editingCreator.wallet);
-        if (!updateResult.success) {
-          showMessage('error', updateResult.error || 'Failed to update creator wallet');
+        const success = await sdk.updateCreatorWallet(
+          editingCreator.id, 
+          editingCreator.wallet, 
+          selectedChainId
+        );
+        if (!success) {
+          showMessage('error', 'Failed to update creator wallet');
           return;
         }
       }
       
+      // Update tier if changed (SDK uses 0-based tiers)
       if (originalCreator.tier !== editingCreator.tier) {
-        updateResult = await sdk.updateCreatorTier(editingCreator.id, editingCreator.tier - 1);
-        if (!updateResult.success) {
-          showMessage('error', updateResult.error || 'Failed to update creator tier');
+        const success = await sdk.updateCreatorTier(
+          editingCreator.id, 
+          (editingCreator.tier - 1) as MembershipTier, 
+          selectedChainId
+        );
+        if (!success) {
+          showMessage('error', 'Failed to update creator tier');
           return;
         }
       }
@@ -178,6 +179,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
       showMessage('success', `Creator ${editingCreator.id} updated successfully`);
       setEditingCreator(null);
       
+      // Reload creators to get updated data
       await loadCreators();
     } catch (error) {
       console.error('Failed to update creator:', error);
@@ -207,20 +209,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         return;
       }
       
-      // Initialize SDK for selected chain
-      await sdk.initializeForChain(selectedChainId);
-      
-      // Toggle creator status
-      const result = await sdk.setCreatorStatus(creatorId, !creator.active);
-      
-      if (result.success) {
-        showMessage('success', `Creator ${creatorId} ${creator.active ? 'deactivated' : 'activated'} successfully`);
-        
-        // Reload creators to get updated data
-        await loadCreators();
-      } else {
-        showMessage('error', result.error || 'Failed to update creator status');
-      }
+      // Note: The current SDK doesn't have setCreatorStatus method
+      // This would require a contract method that doesn't exist in current interface
+      // For now, we'll show a message that this feature isn't implemented
+      showMessage('error', 'Creator status toggle is not yet implemented in the current contract version');
     } catch (error) {
       console.error('Failed to toggle creator status:', error);
       showMessage('error', 'Transaction failed or was rejected');
