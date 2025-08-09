@@ -192,13 +192,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3">
             <Shield className="w-10 h-10 text-blue-600" />
-            Admin Creator Management
+            Creator Management
           </h1>
-          <p className="text-xl text-gray-600 mb-4">
-            Complete creator lifecycle management - Add, configure tiers, and manage status
-          </p>
           <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-blue-100 text-blue-800 mb-4">
-            ✨ Demo: Full admin functionality with tier management and status controls
+            ✨ Demo: with tier management and status controls
           </div>
         </div>
 
@@ -272,7 +269,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <ChainSelector
               value={selectedChainId}
               onChange={setSelectedChainId}
-              label="Target Chain for Creator Management"
+              label="Select Chain"
               className="w-full"
             />
             <p className="text-sm text-gray-500 mt-2">
@@ -719,37 +716,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ client, sdk }) => {
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• Native tokens (ETH, MATIC, BNB) are automatically supported</li>
               <li>• ERC20 tokens require contract addresses and decimal precision</li>
-              <li>• Stablecoins (USDC, DAI, USDT) offer better conversion rates</li>
-              <li>• Popular tokens are highlighted in the tipping interface</li>
-              <li>• Test tokens in testnet environments before mainnet activation</li>
             </ul>
-          </div>
-        </div>
-
-        {/* Info Section */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <h3 className="text-xl font-semibold mb-4 text-gray-900">Admin Management Features</h3>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-medium mb-3 text-blue-600">Creator Management:</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>• Add new creators with wallet addresses</li>
-                <li>• Assign membership tiers (1-4) with different revenue splits</li>
-                <li>• Update creator wallet addresses for recovery</li>
-                <li>• Modify creator membership tiers</li>
-                <li>• Activate/deactivate creators as needed</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium mb-3 text-green-600">Revenue Tiers:</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>• <strong>Tier 1:</strong> 60% creator, 40% business</li>
-                <li>• <strong>Tier 2:</strong> 70% creator, 30% business</li>
-                <li>• <strong>Tier 3:</strong> 80% creator, 20% business</li>
-                <li>• <strong>Tier 4:</strong> 90% creator, 10% business</li>
-                <li>• All splits applied after 5% platform fee</li>
-              </ul>
-            </div>
           </div>
         </div>
       </div>
